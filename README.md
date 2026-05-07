@@ -43,3 +43,14 @@ This backend was engineered with strict adherence to Object-Oriented Design and 
    ```bash
    git clone [https://github.com/BLD933/ai-ats-engine.git](https://github.com/YOUR_GITHUB_USERNAME/ai-ats-engine.git)
    cd ai-ats-engine
+
+2. **Configure the AI API Key:**
+   Open `src/main/resources/application.properties` and add your Groq API key:
+
+3. **Run the Spring Boot Server:**
+   ```bash
+   gradle bootrun
+   ```
+
+4.**Run the Spring Boot Server:**
+Simply double-click the `index.html` file in your browser, or serve it via a live server. Upload a PDF, paste a job description, and watch the engine work.
