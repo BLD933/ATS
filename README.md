@@ -1,4 +1,4 @@
-# 🚀 AI-Powered ATS Parsing Engine
+# AI-Powered ATS Parsing Engine
 
 ![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
@@ -9,14 +9,14 @@ A full-stack, AI-integrated Applicant Tracking System (ATS) designed to eliminat
 
 > **Visual Demo** > *[Replace this text and link with an actual screenshot of your dark-mode UI running]* > `<img src="link_to_your_screenshot.png" width="800">`
 
-## ✨ Key Features
+## Key Features
 
-* **🧠 LLM-Driven Data Extraction:** Bypasses fragile Regex parsing by utilizing the Groq API (Llama 3) to accurately structure unstructured CV data and job descriptions into precise JSON.
-* **⚖️ Weighted Priority Scoring:** Employs a custom mathematical engine dividing job requirements into "Mandatory" (70% weight) and "Nice-to-Have" (30% weight) categories.
-* **🔍 Deep Gap Analysis:** Generates a comprehensive breakdown of explicitly matched skills and missing qualifications for recruiter review.
-* **🎨 Premium Glassmorphism UI:** A responsive, dark-theme frontend built with Vanilla HTML/CSS/JS, featuring state management, asynchronous multipart form uploads, and 60fps SVG stroke animations.
+* ** LLM-Driven Data Extraction:** Bypasses fragile Regex parsing by utilizing the Groq API (Llama 3) to accurately structure unstructured CV data and job descriptions into precise JSON.
+* ** Weighted Priority Scoring:** Employs a custom mathematical engine dividing job requirements into "Mandatory" (70% weight) and "Nice-to-Have" (30% weight) categories.
+* ** Deep Gap Analysis:** Generates a comprehensive breakdown of explicitly matched skills and missing qualifications for recruiter review.
+* ** Premium Glassmorphism UI:** A responsive, dark-theme frontend built with Vanilla HTML/CSS/JS, featuring state management, asynchronous multipart form uploads, and 60fps SVG stroke animations.
 
-## 🏗️ Architecture & Design Patterns
+##  Architecture & Design Patterns
 
 This backend was engineered with strict adherence to Object-Oriented Design and SOLID principles:
 
@@ -24,14 +24,14 @@ This backend was engineered with strict adherence to Object-Oriented Design and 
 * **Modern DTOs:** Utilizes Java 16+ `record` classes (e.g., `DetailedScore`, `Candidate`, `Job`) to ensure complete immutability and thread-safe JSON serialization.
 * **Native HTTP Client:** Uses Java's native `HttpClient` for external API communication, keeping the footprint lightweight and avoiding bloated third-party wrappers.
 
-## 💻 Tech Stack
+## Tech Stack
 
 **Backend:** Java 17+, Spring Boot, Apache PDFBox, Jackson (JSON processing)  
 **Frontend:** HTML5, CSS3, Vanilla JavaScript (Fetch API, FormData)  
 **AI Integration:** Groq API  
 **Build Tool:** Gradle  
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 * Java 17 or higher installed.
