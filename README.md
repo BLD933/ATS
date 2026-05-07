@@ -51,6 +51,5 @@ This backend was engineered with strict adherence to Object-Oriented Design and 
    ```bash
    gradle bootrun
    ```
-
-4.**Run the Spring Boot Server:**
+4. **Run the Spring Boot Server:**
 Simply double-click the `index.html` file in your browser, or serve it via a live server. Upload a PDF, paste a job description, and watch the engine work.
