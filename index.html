@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATS Parsing Engine</title>
+    <!-- Import Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+
+    <div class="ats-container">
+        
+        <!-- ================= FORM SECTION ================= -->
+        <div id="formSection" class="fade-in">
+            <div class="ats-header">
+                <h2>ATS Parsing Engine</h2>
+                <p>Upload a candidate's CV and provide the target job description.</p>
+            </div>
+
+            <form id="cvForm" class="ats-form">
+                <div class="form-group">
+                    <label for="resume" class="form-label">Candidate Resume (PDF)</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="resume" name="cvFile" accept=".pdf" class="file-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="Job" class="form-label">Target Job Description</label>
+                    <textarea id="Job" name="description" rows="5" class="text-input" placeholder="Paste the job requirements here..." required></textarea>
+                </div>
+
+                <button type="submit" id="submitBtn" class="submit-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Analyze Candidate
+                </button>
+            </form>
+        </div>
+
+
+        <!-- ================= RESULTS SECTION ================= -->
+        <div id="resultsDashboard" class="ats-results hidden fade-in">
+            
+            <!-- Animated Score Circle -->
+            <div class="score-container">
+                <svg class="score-svg" viewBox="0 0 140 140">
+                    <defs>
+                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#818cf8" />
+                            <stop offset="100%" stop-color="#c084fc" />
+                        </linearGradient>
+                    </defs>
+                    <circle class="score-bg" cx="70" cy="70" r="60"></circle>
+                    <circle class="score-progress" id="scoreCircle" cx="70" cy="70" r="60"></circle>
+                </svg>
+                <div class="score-text"><span id="finalScoreDisplay">0</span>%</div>
+            </div>
+            
+            <!-- Candidate Info -->
+            <div class="candidate-info">
+                <h3 id="candidateName">Candidate Name</h3>
+                <p>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    <span id="candidateEmail">email@example.com</span>
+                </p>
+                <p>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    <span id="candidatePhone">+1234567890</span>
+                </p>
+            </div>
+
+            <!-- Skills Board -->
+            <div class="skills-board">
+                <div class="skills-col matched">
+                    <h4>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        Matched Skills
+                    </h4>
+                    <div id="matchedSkillsList" class="tags-container"></div>
+                </div>
+                <div class="skills-col missing">
+                    <h4>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        Missing Skills
+                    </h4>
+                    <div id="missingSkillsList" class="tags-container"></div>
+                </div>
+            </div>
+
+            <button type="button" class="reset-btn" onclick="resetApp()">Scan Another CV</button>
+        </div>
+
+    </div>
+
+    <script>
+        document.getElementById('cvForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); 
+
+            const fileInput = document.getElementById('resume');
+            const jobDescription = document.getElementById('Job');
+            const submitBtn = document.getElementById('submitBtn');
+
+            if (fileInput.files.length === 0) return;
+
+            // 1. Loading UI State
+            const originalBtnHtml = submitBtn.innerHTML;
+            submitBtn.innerHTML = `
+                <svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+                Processing...
+            `;
+            submitBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('cvFile', fileInput.files[0]);
+            formData.append('jobDescription', jobDescription.value); // Ensure this matches @RequestParam in Java
+
+            try {
+                // Remove the URL domain to allow relative fetching if hosted, or keep localhost for dev
+                const response = await fetch('http://localhost:8080/api/v1/cv/analyze', {
+                    method: 'POST',
+                    body: formData 
+                });
+
+                if (!response.ok) throw new Error("Server error: " + response.status);
+
+                const result = await response.json(); 
+                
+                // 2. Map Data to Dashboard
+                const info = result.candidate?.personalInfo || {};
+                document.getElementById('candidateName').textContent = info.fullName || "Unknown Candidate";
+                document.getElementById('candidateEmail').textContent = info.email || "No email available";
+                document.getElementById('candidatePhone').textContent = info.phone || "No phone available";
+
+                // Generate Tags
+                const matchedHTML = (result.matchedSkills || []).map(skill => `<span class="tag matched">${skill}</span>`).join('');
+                document.getElementById('matchedSkillsList').innerHTML = matchedHTML || '<span style="color:#64748b; font-size:13px;">No direct matches found.</span>';
+
+                const missingHTML = (result.missingSkills || []).map(skill => `<span class="tag missing">${skill}</span>`).join('');
+                document.getElementById('missingSkillsList').innerHTML = missingHTML || '<span style="color:#64748b; font-size:13px;">No missing skills!</span>';
+
+                // 3. View Transition
+                document.getElementById('formSection').classList.add('hidden');
+                document.getElementById('resultsDashboard').classList.remove('hidden');
+
+                // 4. Animate the Score
+                animateScore(result.finalScore || 0);
+
+            } catch (error) {
+                console.error("Network error:", error);
+                alert("Failed to analyze CV. Ensure your Spring Boot backend is running.");
+                submitBtn.innerHTML = originalBtnHtml;
+                submitBtn.disabled = false;
+            }
+        });
+
+        function animateScore(targetScore) {
+            const scoreDisplay = document.getElementById('finalScoreDisplay');
+            const scoreCircle = document.getElementById('scoreCircle');
+            
+            // Calculate SVG Stroke Offset
+            // Circumference is 377. Dash offset 377 = 0%. Dash offset 0 = 100%.
+            const offset = 377 - (377 * targetScore) / 100;
+            
+            // Force reflow to ensure CSS transition triggers
+            scoreCircle.getBoundingClientRect();
+            scoreCircle.style.strokeDashoffset = offset;
+
+            // Animate Number
+            let current = 0;
+            const duration = 1500; // 1.5 seconds
+            const increment = targetScore / (duration / 16); // 60fps
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if (current >= targetScore) {
+                    clearInterval(timer);
+                    scoreDisplay.textContent = targetScore;
+                } else {
+                    scoreDisplay.textContent = Math.round(current);
+                }
+            }, 16);
+        }
+
+        function resetApp() {
+            // Reset UI State
+            document.getElementById('formSection').classList.remove('hidden');
+            document.getElementById('resultsDashboard').classList.add('hidden');
+            
+            // Reset Form and Button
+            document.getElementById('cvForm').reset();
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Analyze Candidate
+            `;
+
+            // Reseat Animation Ring
+            document.getElementById('scoreCircle').style.transition = 'none';
+            document.getElementById('scoreCircle').style.strokeDashoffset = 377;
+            setTimeout(() => {
+                document.getElementById('scoreCircle').style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+            }, 50);
+        }
+
+        // Add spinning animation for loading icon
+        const style = document.createElement('style');
+        style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

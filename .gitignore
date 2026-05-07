@@ -1,0 +1,15 @@
+# Build folders (DO NOT COMMIT)
+.gradle/
+build/
+bin/
+
+# IDE settings (DO NOT COMMIT)
+.idea/
+.vscode/
+
+# Compiled files
+*.class
+*.jar
+
+# Test Resumes
+*.pdf
