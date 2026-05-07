@@ -7,7 +7,7 @@
 
 A full-stack, AI-integrated Applicant Tracking System (ATS) designed to eliminate the "black box" nature of traditional HR screening. This engine parses PDF resumes, leverages Large Language Models for semantic extraction, and applies a custom-weighted mathematical algorithm to generate detailed candidate gap analyses.
 
-> **Visual Demo** > *[Replace this text and link with an actual screenshot of your dark-mode UI running]* > `<img src="link_to_your_screenshot.png" width="800">`
+> **Visual Demo** > <img width="1041" height="857" alt="image" src="https://github.com/user-attachments/assets/92e476f5-28a5-42b4-a383-77383bbaa950" />
 
 ## Key Features
 
