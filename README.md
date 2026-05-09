@@ -41,7 +41,7 @@ This backend was engineered with strict adherence to Object-Oriented Design and 
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/BLD933/ai-ats-engine.git
+   git git@github.com:BLD933/ATS.git
    cd ai-ats-engine
 
 2. **Configure the AI API Key:**
