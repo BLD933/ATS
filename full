@@ -1,0 +1,2289 @@
+package com.bld.ats;
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+
+@SpringBootApplication
+public class AtsApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtsApplication.class, args);
+    }
+}package com.bld.ats.controller;
+
+
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.bld.ats.service.AtsProcessingService;
+import com.bld.ats.scoring.DetailedScore;
+
+@RestController
+@CrossOrigin(origins = "*")
+@RequestMapping("/api/v1/cv")
+public class AtsController {
+
+
+    private final AtsProcessingService atsService = new AtsProcessingService();
+
+    @PostMapping("/analyze")
+    public ResponseEntity<DetailedScore> analyzeCv(@RequestParam("cvFile") MultipartFile cvFile,
+                                                   @RequestParam("jobDescription") String jobDescription) {
+            try{// 3. You just use the instance! No "new" keyword, and no static methods.
+                if (cvFile == null || jobDescription == null) {
+                    return ResponseEntity.badRequest().build();
+                }
+
+                return ResponseEntity.ok(atsService.evaluateCandidate(cvFile, jobDescription));
+            }catch (RuntimeException e) {
+                e.printStackTrace();
+                return ResponseEntity.badRequest().build();
+            }
+
+        }
+
+}
+
+package com.bld.ats.controller;
+
+// This is the entire file! 
+// It perfectly defines the JSON shape we expect from the frontend.
+public record UploadRequest(String cvText, String jobText) {}
+package com.bld.ats.extraction;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import com.bld.ats.model.Candidate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class CandidateInfoExtractor implements InfoExtractor<Candidate> {
+
+    // You get this from the AI provider (e.g., Google AI Studio)
+
+    
+
+    @Override
+    public Candidate extractInfosWithAI(String rawResumeText) {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+            ObjectNode requestBody = objectMapper.createObjectNode();
+
+            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+
+            ObjectNode systemMsg = objectMapper.createObjectNode();
+
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "You are an ATS system. Extract all the information from the following resume text, in a structured way, the response should be ONLY in json format, specificaly in this EXACT format: {\"personalInfo\":{\"fullName\":\"String\",\"email\":\"String or null\",\"phone\":\"String or null\",\"location\":\"String or null\",\"webLinks\":\"Object (Key: String, Value: String) or null\"},\"summary\":\"String\",\"categorizedSkills\":\"Object (Key: String category name, Value: Array of Strings) or null\",\"experience\":[{\"role\":\"String or null\",\"organization\":\"String or null\",\"startDate\":\"String or null\",\"endDate\":\"String or null\",\"description\":\"String\",\"highlights\":[\"String\"]}],\"education\":[{\"degreeOrCertificate\":\"String or null\",\"institution\":\"String\",\"dateRange\":\"String or null\",\"details\":\"Object (Key: String detail name, Value: String) or null\"}],\"projects\":[{\"name\":\"String\",\"description\":\"String\",\"tags\":[\"String\"]}],\"additionalInfo\":\"Object (Key: String category name, Value: Array of Strings) or null\"}. For any field marked as 'Object', you are free to generate the key names based on the candidate's specific profession, but the values MUST strictly follow the specified data type (String or Array of Strings).");
+
+            messages.add(systemMsg);
+
+            ObjectNode exampleUserMsg = objectMapper.createObjectNode();
+
+            exampleUserMsg.put("role", "user");
+            exampleUserMsg.put("content","Contact\nTéléphone\n+212607039162\nEmail\nbouloud94@gmail.com\nAddresse\ncasablanca, oulfa\nExpertise\nCybersécurité\nRéseaux\nC/C++\nPython (pwntools/angr)\nLinux (Fedora/Hyprland)\nGeomatics Engineering\nLaTeX\nBash Scripting\nCréation de contenu technique\nAnalyse stratégique\npython\nLanguage\nAnglais\nArabe\nFrançais\nHobbies\nÉchecs\nCTFs (des challenges en\ncybersecurite)\nProgramming\nBOULOUD MOHAMMED\nStagiaire en Développement\nÉtudiant de 1ère année du cycle d'\''ingénieur en Géomatique et Systèmes d'\''Information (SIG) à\nI'\''EHTP, très motivé, s'\''appuyant sur de solides bases en Mathématiques, Physique et\nInformatique (MIP). Rigoureux, autonome et naturellement curieux, avec une expérience\navérée dans la direction de projets d'\''automatisation et de gestion de bases de données.\nPassionné par la programmation bas niveau, la rétro-ingénierie et l'\''architecture système.\nDésireux d'\''apporter un esprit analytique aiguisé et un solide bagage technique full-stack à\nune équipe de développement dynamique.\nEducation\nÉcole Hassania des Travaux Publics (ЕНТР)\nÉlève ingénieur en 1ère année - SIG\nCours spécialisés en algorithmique avancée, programmation système et géomatique.\nFaculté des Sciences Ain Chock\nDEUG (Bac+2) - Informatique (MIP) | 09/2023 - 09/2025\nÉtudes intensives en Mathématiques, Informatique et Physique.\nFormation axée sur la compréhension approfondie des systèmes informatiques, des algorithmes\net de la programmation logicielle.\nCompétences Techniques\nLangages de Programmation: C/C++, Python, JavaScript, HTML/CSS.\nBas Niveau & Cybersécurité: Rétro-ingénierie, Exploitation de binaires, Shellcode, Gestion de la\nmémoire, GDB, IDA Pro.\nBases de Données & Développement Web: SQL, NoSQL, React, Vue.js, APIs REST.\nSystèmes & Outils: Système d'\''exploitation Linux (Avancé: Fedora, Gestionnaire de fenêtres\nHyprland), Git, Office 365. Outils de Géomatique & Ingénierie: QGIS, Photogrammétrie,\nGéodésie mathématique et physique.\nProjets Techniques & Réalisations\nDéveloppement de jeu en C++:\n이\nDéveloppement d'\''un jeu de plateau Kõnane entièrement fonctionnel à partir de\nzéro en utilisant le C++ avec les bibliothèques ncurses et SDL, améliorant ainsi les\ncompétences en programmation et en gestion de projet.\nCollaboration avec des pairs pour optimiser les mécanismes de jeu, améliorant\nl'\''engagement des utilisateurs et l'\''expérience de jeu globale.\nCybersécurité (CTF):\n• Analyse et exploitation de binaires dans le cadre de défis Capture The Flag (CTF),\nen appliquant des techniques avancées de rétro-ingénierie pour identifier les\nvulnérabilités.\n이 Rédaction de rapports détaillés sur les découvertes, démontrant de solides\ncompétences analytiques nécessaires à l'\''analyse de données et à la sensibilisation\nà la cybersécurité.\n• Géomatique & Analyse SIG:\n이 Réalisation d'\''un mini-projet appliquant les concepts de géodésie physique et\nmathématique et de photogrammétrie à l'\''aide de QGIS, démontrant des\ncompétences en analyse spatiale.\nAutomatisation de bases de données:\n• Direction de projets axés sur l'\''automatisation des flux de travail et l'\''intégration\nde bases de données sécurisées, faisant preuve de leadership dans les pratiques\n이\nde développement logiciel.\nUtilisation de Python pour le développement backend, en adéquation avec\nexigences des stages en développement Python.");
+            
+            messages.add(exampleUserMsg);
+
+            ObjectNode assistantMsg = objectMapper.createObjectNode();
+
+            assistantMsg.put("role", "assistant");
+            assistantMsg.put("content", "{\"personalInfo\":{\"fullName\":\"BOULOUD MOHAMMED\",\"email\":\"bouloud94@gmail.com\",\"phone\":\"+212607039162\",\"location\":\"Casablanca, Oulfa\",\"webLinks\":null},\"summary\":\"Étudiant de 1ère année du cycle d'ingénieur en Géomatique et Systèmes d'Information (SIG) à l'EHTP, très motivé, s'appuyant sur de solides bases en Mathématiques, Physique et Informatique (MIP). Rigoureux, autonome et naturellement curieux, avec une expérience avérée dans la direction de projets d'automatisation et de gestion de bases de données. Passionné par la programmation bas niveau, la rétro-ingénierie et l'architecture système. Désireux d'apporter un esprit analytique aiguisé et un solide bagage technique full-stack à une équipe de développement dynamique.\",\"categorizedSkills\":{\"Langages de Programmation\":[\"C/C++\",\"Python\",\"JavaScript\",\"HTML/CSS\",\"Bash Scripting\",\"LaTeX\"],\"Bas Niveau & Cybersécurité\":[\"Cybersécurité\",\"Rétro-ingénierie\",\"Exploitation de binaires\",\"Shellcode\",\"Gestion de la mémoire\",\"GDB\",\"IDA Pro\",\"pwntools/angr\",\"Réseaux\"],\"Bases de Données & Développement Web\":[\"SQL\",\"NoSQL\",\"React\",\"Vue.js\",\"APIs REST\"],\"Systèmes & Outils\":[\"Linux (Fedora/Hyprland)\",\"Git\",\"Office 365\"],\"Géomatique & Ingénierie\":[\"Geomatics Engineering\",\"QGIS\",\"Photogrammétrie\",\"Géodésie mathématique et physique\"],\"Soft Skills\":[\"Création de contenu technique\",\"Analyse stratégique\",\"Autonomie\",\"Rigueur\",\"Leadership\"]},\"experience\":[{\"role\":\"Stagiaire en Développement\",\"organization\":null,\"startDate\":null,\"endDate\":null,\"description\":\"Direction de projets axés sur l'automatisation des flux de travail et l'intégration de bases de données sécurisées. Utilisation de Python pour le développement backend, en adéquation avec les exigences des stages en développement Python.\",\"highlights\":[\"Automatisation des flux de travail\",\"Intégration de bases de données sécurisées\",\"Développement backend avec Python\"]}],\"education\":[{\"degreeOrCertificate\":\"Élève ingénieur en 1ère année - SIG\",\"institution\":\"École Hassania des Travaux Publics (EHTP)\",\"dateRange\":null,\"details\":{\"Cours Spécialisés\":\"Algorithmique avancée, programmation système et géomatique.\"}},{\"degreeOrCertificate\":\"DEUG (Bac+2) - Informatique (MIP)\",\"institution\":\"Faculté des Sciences Ain Chock\",\"dateRange\":\"09/2023 - 09/2025\",\"details\":{\"Focus\":\"Études intensives en Mathématiques, Informatique et Physique. Compréhension approfondie des systèmes informatiques, des algorithmes et de la programmation logicielle.\"}}],\"projects\":[{\"name\":\"Développement de jeu en C++\",\"description\":\"Développement d'un jeu de plateau Kōnane entièrement fonctionnel à partir de zéro, améliorant les compétences en programmation et en gestion de projet.\",\"tags\":[\"C++\",\"ncurses\",\"SDL\",\"Optimisation\"]},{\"name\":\"Cybersécurité (CTF)\",\"description\":\"Analyse et exploitation de binaires dans le cadre de défis Capture The Flag (CTF). Rédaction de rapports détaillés sur les découvertes.\",\"tags\":[\"Rétro-ingénierie\",\"Vulnérabilités\",\"Analyse de données\"]},{\"name\":\"Géomatique & Analyse SIG\",\"description\":\"Réalisation d'un mini-projet appliquant les concepts de géodésie physique et mathématique et de photogrammétrie à l'aide de QGIS.\",\"tags\":[\"QGIS\",\"Photogrammétrie\",\"Analyse spatiale\"]}],\"additionalInfo\":{\"Languages\":[\"Anglais\",\"Arabe\",\"Français\"],\"Hobbies\":[\"Échecs\",\"CTFs (des challenges en cybersecurite)\",\"Programming\"]}}"
+            );
+
+            messages.add(assistantMsg);
+
+            ObjectNode userMsg = objectMapper.createObjectNode();
+
+            userMsg.put("role", "user");
+            userMsg.put("content", rawResumeText);
+
+            messages.add(userMsg);
+
+
+            requestBody.set("messages", messages);
+
+            requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
+            requestBody.put("temperature", 0);
+            requestBody.put("max_completion_tokens", 1024);
+            requestBody.put("top_p", 1);
+            requestBody.put("stream", false);
+            requestBody.putNull("stop");
+
+            String jsonPayload = objectMapper.writeValueAsString(requestBody);
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + API_KEY)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .build();
+
+            // 4. Send the request and wait for the AI's response
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText(); // Get the content of the AI's response
+            System.out.println(parsedInfo);
+
+            Candidate candidate = objectMapper.readValue(parsedInfo, Candidate.class);
+            // The response will contain the JSON array of skills the AI found!
+            return candidate;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}package com.bld.ats.extraction;
+
+public interface InfoExtractor<extractionType> {
+
+    String API_KEY = System.getenv("GROQ_API_KEY"); 
+    String API_URL = "https://api.groq.com/openai/v1/chat/completions";
+    public extractionType extractInfosWithAI(String prompt);
+}package com.bld.ats.extraction;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import com.bld.ats.model.Job;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class JobInfoExtractor implements InfoExtractor<Job> {
+
+    // You get this from the AI provider (e.g., Google AI Studio)
+
+    @Override
+    public Job extractInfosWithAI(String rawResumeText) {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+            ObjectNode requestBody = objectMapper.createObjectNode();
+
+            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+
+            ObjectNode systemMsg = objectMapper.createObjectNode();
+
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "Extract all the information from the following job description in a structured way, always respond ONLY in a json format in this EXACT format: {\"jobDetails\":{\"title\":\"String\",\"company\":\"String\",\"location\":\"String\",\"employmentType\":\"String (e.g., Full-time, Internship, Contract)\"},\"requirements\":{\"mandatorySkills\":{\"programmingLanguages\":[\"String\"],\"frameworksAndTools\":[\"String\"],\"softSkills\":[\"String\"]},\"niceToHaveSkills\":{\"programmingLanguages\":[\"String\"],\"frameworksAndTools\":[\"String\"],\"softSkills\":[\"String\"]},\"minimumExperienceYears\":\"Integer\",\"minimumEducationLevel\":\"String\"},\"responsibilities\":[\"String\"]}");
+
+            messages.add(systemMsg);
+            
+            ObjectNode exampleUserMsg = objectMapper.createObjectNode();
+
+            exampleUserMsg.put("role", "user");
+            exampleUserMsg.put("content", "Job Posting: Software Engineering Intern (Backend & Security Focus)\n" + //
+                                "Company: CipherTech Systems\n" + //
+                                "Location: Casablanca, Morocco (Hybrid)\n" + //
+                                "About Us:CipherTech Systems is a leading infrastructure and security firm. We build robust backend services and ensure our clients' data is safe from emerging threats. We are looking for an analytical engineering student to join our core backend team for a 4-month internship.\n" + //
+                                "The Role:As a Software Engineering Intern, you will work closely with our backend architecture and security teams. You will help build out RESTful APIs, optimize database queries, and assist in security auditing of our internal systems. The ideal candidate has a hacker mindset, loves the terminal, and writes clean, object-oriented code.\n" + //
+                                "Mandatory Technical Skills:Strong proficiency in Java and backend architecture, Solid understanding of Object-Oriented Programming (OOP) and Data Structures.\n" + //
+                                "Experience with systems-level programming languages, specifically C or C++.\n" + //
+                                "Comfortable working in a Linux environment (command line, bash scripting, system administration).\n" + //
+                                "Familiarity with foundational cybersecurity concepts, reverse engineering, or participation in CTF (Capture The Flag) competitions.\n" + //
+                                "Nice-to-Have Qualifications:\n" + //
+                                "Scripting experience using Python.\n" + //
+                                "Experience building containerized applications using Docker and orchestrating with Kubernetes.\n" + //
+                                "Familiarity with algorithm optimization (e.g., Minimax, pathfinding).\n" + //
+                                "Currently enrolled in an engineering cycle (Cycle Ingénieur) related to computer science, geomatics, or secure systems.\n" + //
+                                "Responsibilities: Develop and maintain Java-based backend services, Perform binary analysis and assist in vulnerability patching, Write secure, efficient, and well-documented code.");
+            messages.add(exampleUserMsg);
+
+            ObjectNode assistantMsg = objectMapper.createObjectNode();
+
+            assistantMsg.put("role", "assistant");
+            assistantMsg.put("content", "{\"jobDetails\":{\"title\":\"Software Engineering Intern\",\"company\":\"CipherTech Systems\",\"location\":\"Casablanca, Morocco (Hybrid)\",\"employmentType\":\"Internship\"},\"requirements\":{\"mandatorySkills\":{\"programmingLanguages\":[\"Java\",\"C\",\"C++\"],\"frameworksAndTools\":[\"Linux\",\"bash scripting\",\"system administration\",\"reverse engineering\",\"CTF (Capture The Flag)\",\"Data Structures\"],\"softSkills\":[\"analytical\",\"hacker mindset\"]},\"niceToHaveSkills\":{\"programmingLanguages\":[\"Python\"],\"frameworksAndTools\":[\"Docker\",\"Kubernetes\",\"algorithm optimization\",\"Minimax\",\"pathfinding\"],\"softSkills\":[]},\"minimumExperienceYears\":0,\"minimumEducationLevel\":\"Cycle Ingénieur (computer science, geomatics, or secure systems)\"},\"responsibilities\":[\"Develop and maintain Java-based backend services.\",\"Perform binary analysis and assist in vulnerability patching.\",\"Write secure, efficient, and well-documented code.\"]}"
+            );
+
+            messages.add(assistantMsg);
+
+            ObjectNode userMsg = objectMapper.createObjectNode();
+
+            userMsg.put("role", "user");
+            userMsg.put("content", rawResumeText);
+
+            messages.add(userMsg);
+            requestBody.set("messages", messages);
+
+            requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
+            requestBody.put("temperature", 0);
+            requestBody.put("max_completion_tokens", 1024);
+            requestBody.put("top_p", 1);
+            requestBody.put("stream", false);
+            requestBody.putNull("stop");
+
+            // ObjectNode compound_custom = objectMapper.createObjectNode();
+            // ArrayNode enabled_tools = objectMapper.createArrayNode();
+            // enabled_tools.add("web_search");
+            // enabled_tools.add("code_interpreter");
+            // enabled_tools.add("visit_website");
+            // compound_custom.set("enabled_tools", enabled_tools);
+            // requestBody.set("compound_custom", compound_custom);
+
+
+
+            
+            String jsonPayload = objectMapper.writeValueAsString(requestBody);
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + API_KEY)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .build();
+
+            // 4. Send the request and wait for the AI's response
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText();
+            System.out.println("Parsed info: " + parsedInfo);
+            Job jobObj = objectMapper.readValue(parsedInfo, Job.class);
+            // The response will contain the JSON array of skills the AI found!
+            return jobObj;
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}package com.bld.ats.model;
+
+import java.util.List;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * A completely generalized Candidate model suitable for any profession.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record Candidate(
+    PersonalInfo personalInfo,
+    String summary,
+    
+    // The ultimate flexible bucket for skills: 
+    // e.g., "Technical" -> ["Java"], "Languages" -> ["French"], "Soft" -> ["Leadership"]
+    Map<String, List<String>> categorizedSkills, 
+    
+    List<Experience> experience,
+    List<Education> education,
+    List<Project> projects,
+    
+    // A catch-all for anything weird or specific the AI finds (certifications, awards, hobbies)
+    Map<String, Object> additionalInfo 
+) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PersonalInfo(
+        String fullName,
+        String email,
+        String phone,
+        String location,
+        
+        // Instead of hardcoding githubUrl or linkedinUrl, we use a map for ALL links
+        // e.g., "LinkedIn" -> "url", "Portfolio" -> "url", "Dribbble" -> "url"
+        Map<String, String> webLinks 
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Experience(
+        String role,          // Generalized from "jobTitle"
+        String organization,  // Generalized from "company" (could be a school, NGO, etc.)
+        String startDate,
+        String endDate,
+        String description,
+        List<String> highlights // Extracted bullet points of achievements
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Education(
+        String degreeOrCertificate,
+        String institution,
+        String dateRange,
+        
+        // Catch-all for things like GPA, Honors, Minors, etc.
+        Map<String, String> details 
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Project(
+        String name,
+        String description,
+        
+        // Generalized from "technologiesUsed". A chef might have "ingredients", a designer "tools".
+        List<String> tags 
+    ) {}
+}package com.bld.ats.model;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * The main root object that holds the entire Job JSON payload.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record Job(
+    JobDetails jobDetails,
+    JobRequirements requirements,
+    List<String> responsibilities
+) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record JobDetails(
+        String title,
+        String company,
+        String location,
+        String employmentType
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record JobRequirements(
+        SkillSet mandatorySkills,
+        SkillSet niceToHaveSkills,
+        int minimumExperienceYears,
+        String minimumEducationLevel
+    ) {}
+
+    /**
+     * Notice how we only have to write this once, but we use it 
+     * for both mandatorySkills AND niceToHaveSkills in the requirements!
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SkillSet(
+        List<String> programmingLanguages,
+        List<String> frameworksAndTools,
+        List<String> softSkills
+    ) {}
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+
+public class CVScoringEngine {
+    
+    private final ScoringStrategy strategy;
+
+    // Default constructor uses the Weighted Priority
+    public CVScoringEngine() {
+        this.strategy = new WeightedPriorityStrategy();
+    }
+
+    // Allows you to inject a different strategy later (e.g., StrictKeywordStrategy)
+    public CVScoringEngine(ScoringStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public double match(Candidate candidate, Job job) {
+        return strategy.calculateScore(candidate, job);
+    }
+
+    public DetailedScore matchDetailedScore(Candidate candidate, Job job) {
+        return strategy.calculateDetailedScore(candidate, job);
+    }
+}package com.bld.ats.scoring;
+
+
+import java.util.List;
+import com.bld.ats.model.Candidate;
+
+public record DetailedScore(
+    int finalScore,
+    int mandatoryScore,
+    int bonusScore,
+    List<String> matchedSkills,
+    List<String> missingSkills,
+    Candidate candidate // Sending the parsed data back to the UI!
+) {}
+package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.model.Job.SkillSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class KeywordMatchStrategy implements ScoringStrategy {
+
+    @Override
+    public double calculateScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return 0;
+        }
+
+        // 1. Extract every single requirement from the Job
+        Set<String> targetKeywords = extractJobKeywords(job);
+        if (targetKeywords.isEmpty()) {
+            return 100; // No requirements means instant match
+        }
+
+        // 2. Build a massive "Corpus" (a giant string) of everything the candidate wrote
+        String candidateCorpus = buildCandidateCorpus(candidate).toLowerCase();
+
+        // 3. Count how many keywords appear in the corpus
+        int matches = 0;
+        for (String keyword : targetKeywords) {
+            // We pad with spaces to avoid accidental substring matches 
+            // e.g., finding "C" inside "React"
+            if (candidateCorpus.contains(" " + keyword.toLowerCase() + " ") || 
+                candidateCorpus.contains(keyword.toLowerCase())) { 
+                matches++;
+            }
+        }
+
+        // 4. Calculate percentage
+        double score = (double) matches / targetKeywords.size();
+        return Math.round(score * 100);
+    }
+
+    @Override
+    public DetailedScore calculateDetailedScore(Candidate candidate, Job job) {
+        return null;
+    }
+    /**
+     * Grabs all mandatory and nice-to-have skills from the job description.
+     */
+    private Set<String> extractJobKeywords(Job job) {
+        Set<String> keywords = new HashSet<>();
+        
+        // Helper lambda/method to safely add skills
+        addSkillsToSet(keywords, job.requirements().mandatorySkills());
+        addSkillsToSet(keywords, job.requirements().niceToHaveSkills());
+        
+        return keywords;
+    }
+
+    private void addSkillsToSet(Set<String> set, SkillSet skillSet) {
+        if (skillSet == null) return;
+        if (skillSet.programmingLanguages() != null) set.addAll(skillSet.programmingLanguages());
+        if (skillSet.frameworksAndTools() != null) set.addAll(skillSet.frameworksAndTools());
+        if (skillSet.softSkills() != null) set.addAll(skillSet.softSkills());
+    }
+
+    /**
+     * Smashes all candidate data into one massive, searchable string block.
+     */
+    private String buildCandidateCorpus(Candidate candidate) {
+        StringBuilder corpus = new StringBuilder();
+
+        if (candidate.summary() != null) {
+            corpus.append(candidate.summary()).append(" ");
+        }
+
+        // Add Skills
+        if (candidate.categorizedSkills() != null) {
+            for (List<String> skills : candidate.categorizedSkills().values()) {
+                if (skills != null) {
+                    corpus.append(String.join(" ", skills)).append(" ");
+                }
+            }
+        }
+
+        // Add Experience Descriptions
+        if (candidate.experience() != null) {
+            for (Candidate.Experience exp : candidate.experience()) {
+                if (exp.description() != null) corpus.append(exp.description()).append(" ");
+                if (exp.highlights() != null) corpus.append(String.join(" ", exp.highlights())).append(" ");
+            }
+        }
+
+        // Add Project Descriptions and Tags
+        if (candidate.projects() != null) {
+            for (Candidate.Project proj : candidate.projects()) {
+                if (proj.description() != null) corpus.append(proj.description()).append(" ");
+                if (proj.tags() != null) corpus.append(String.join(" ", proj.tags())).append(" ");
+            }
+        }
+
+        return corpus.toString();
+    }
+
+
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+
+public interface ScoringStrategy {
+    // Takes the candidate's profile and the target job description, returns a score 0-100
+    double calculateScore(Candidate candidate, Job job);
+    DetailedScore calculateDetailedScore(Candidate candidate, Job job);
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.model.Job.SkillSet;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class WeightedPriorityStrategy implements ScoringStrategy {
+
+    private static final double MANDATORY_WEIGHT = 0.70;
+    private static final double NICE_TO_HAVE_WEIGHT = 0.30;
+
+    @Override
+    public double calculateScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return 0;
+        }
+
+        // 1. Flatten all candidate skills into a single searchable pool
+        Set<String> candidateSkillPool = extractCandidateSkills(candidate);
+
+        // 2. Calculate percentages for both requirement categories
+        double mandatoryScore = calculateCategoryMatch(
+                job.requirements().mandatorySkills(), candidateSkillPool);
+                
+        double niceToHaveScore = calculateCategoryMatch(
+                job.requirements().niceToHaveSkills(), candidateSkillPool);
+
+        // 3. Apply weights and calculate final score (out of 100)
+        double finalScore = (mandatoryScore * MANDATORY_WEIGHT) + (niceToHaveScore * NICE_TO_HAVE_WEIGHT);
+        
+        return  Math.round(finalScore * 100);
+    }
+
+    /**
+     * Digs through the candidate's dynamic map and project tags to build a master list of skills.
+     */
+    private Set<String> extractCandidateSkills(Candidate candidate) {
+        Set<String> pool = new HashSet<>();
+
+        // Add all categorized skills
+        if (candidate.categorizedSkills() != null) {
+            for (List<String> skillList : candidate.categorizedSkills().values()) {
+                if (skillList != null) {
+                    for (String skill : skillList) {
+                        pool.add(skill.toLowerCase().trim());
+                    }
+                }
+            }
+        }
+
+        // Add project tags as a backup (e.g., if they used "Docker" in a project but forgot to list it in skills)
+        if (candidate.projects() != null) {
+            for (Candidate.Project project : candidate.projects()) {
+                if (project.tags() != null) {
+                    for (String tag : project.tags()) {
+                        pool.add(tag.toLowerCase().trim());
+                    }
+                }
+            }
+        }
+
+        return pool;
+    }
+
+    /**
+     * Compares the Job's rigid SkillSet against the Candidate's flattened skill pool.
+     */
+    private double calculateCategoryMatch(SkillSet requiredSkills, Set<String> candidatePool) {
+        if (requiredSkills == null) return 0.0;
+
+        // Combine all required skills from this specific Job SkillSet
+        List<String> allRequired = new ArrayList<>();
+        if (requiredSkills.programmingLanguages() != null) allRequired.addAll(requiredSkills.programmingLanguages());
+        if (requiredSkills.frameworksAndTools() != null) allRequired.addAll(requiredSkills.frameworksAndTools());
+        if (requiredSkills.softSkills() != null) allRequired.addAll(requiredSkills.softSkills());
+
+        if (allRequired.isEmpty()) return 1.0; // If they don't require anything, it's an automatic 100% match
+
+        int matchCount = 0;
+
+        for (String requirement : allRequired) {
+            if (isSkillPresent(requirement, candidatePool)) {
+                matchCount++;
+            }
+        }
+
+        return (double) matchCount / allRequired.size();
+    }
+
+    /**
+     * Helper method to do "fuzzy" string matching.
+     */
+    private boolean isSkillPresent(String requirement, Set<String> candidatePool) {
+        String reqLower = requirement.toLowerCase().trim();
+
+        for (String candidateSkill : candidatePool) {
+            // Check for exact match OR if one string is inside the other
+            // Example: requirement="React", candidateSkill="React.js" -> Match!
+            if (candidateSkill.equals(reqLower) || 
+                candidateSkill.contains(reqLower) || 
+                reqLower.contains(candidateSkill)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    @Override
+    public 
+    DetailedScore calculateDetailedScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return new DetailedScore(0, 0, 0, new ArrayList<>(), new ArrayList<>(), null);
+        }
+
+        Set<String> candidateSkillPool = extractCandidateSkills(candidate);
+
+        // Track exactly what they have and what they are missing
+        List<String> matchedSkills = new ArrayList<>();
+        List<String> missingSkills = new ArrayList<>();
+
+        // Analyze Mandatory Skills
+        double mandatoryScore = analyzeCategory(
+                job.requirements().mandatorySkills(), candidateSkillPool, matchedSkills, missingSkills);
+                
+        // Analyze Nice-To-Have Skills
+        double niceToHaveScore = analyzeCategory(
+                job.requirements().niceToHaveSkills(), candidateSkillPool, matchedSkills, missingSkills);
+
+        // Math
+        double finalScore = (mandatoryScore * MANDATORY_WEIGHT) + (niceToHaveScore * NICE_TO_HAVE_WEIGHT);
+        int finalScoreInt = (int) Math.round(finalScore * 100);
+
+        return new DetailedScore(
+                finalScoreInt, 
+                (int) Math.round(mandatoryScore * 100), 
+                (int) Math.round(niceToHaveScore * 100), 
+                matchedSkills, 
+                missingSkills,
+                candidate
+        );
+    }
+    /**
+     * Helper method to analyze a specific category and populate our lists.
+     */
+    private double analyzeCategory(SkillSet requiredSkills, 
+                                   Set<String> candidatePool, 
+                                   List<String> matchedSkills, 
+                                   List<String> missingSkills) {
+        if (requiredSkills == null) return 0.0;
+
+        List<String> allRequired = new ArrayList<>();
+        if (requiredSkills.programmingLanguages() != null) allRequired.addAll(requiredSkills.programmingLanguages());
+        if (requiredSkills.frameworksAndTools() != null) allRequired.addAll(requiredSkills.frameworksAndTools());
+        if (requiredSkills.softSkills() != null) allRequired.addAll(requiredSkills.softSkills());
+
+        if (allRequired.isEmpty()) return 1.0;
+
+        int matchCount = 0;
+
+        for (String requirement : allRequired) {
+            if (isSkillPresent(requirement, candidatePool)) {
+                matchCount++;
+                matchedSkills.add(requirement);
+            } else {
+                missingSkills.add(requirement);
+            }
+        }
+
+        return (double) matchCount / allRequired.size();
+    }
+}
+package com.bld.ats.service;
+
+import java.io.IOException;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.bld.ats.extraction.CandidateInfoExtractor;
+import com.bld.ats.extraction.JobInfoExtractor;
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.scoring.CVScoringEngine;
+import com.bld.ats.scoring.DetailedScore;
+import com.bld.ats.scoring.WeightedPriorityStrategy;
+
+
+public class AtsProcessingService {
+  private final CandidateInfoExtractor candidateExtractor;
+  private final JobInfoExtractor jobExtractor;
+  private final CVScoringEngine scoringEngine;
+
+  public AtsProcessingService() {
+      this.candidateExtractor = new CandidateInfoExtractor();
+      this.jobExtractor = new JobInfoExtractor();
+      
+      // We inject our smart strategy here! 
+      // If you ever want to change how the ATS scores, you ONLY change this one line.
+      this.scoringEngine = new CVScoringEngine(new WeightedPriorityStrategy());
+  }
+
+  public DetailedScore evaluateCandidate(MultipartFile cvFile, String rawJobDescriptionText) {
+      try (PDDocument document = Loader.loadPDF(cvFile.getInputStream().readAllBytes())) {
+      PDFTextStripper stripper = new PDFTextStripper();
+      String rawCvText = stripper.getText(document);
+      
+
+      // STEP 1: Extract the data using AI (The API Calls)
+      System.out.println("Extracting Candidate Data...");
+      Candidate candidate = candidateExtractor.extractInfosWithAI(rawCvText);
+      
+      System.out.println("Extracting Job Data...");
+      Job job = jobExtractor.extractInfosWithAI(rawJobDescriptionText);
+
+      // STEP 2: Safety Check (If the AI failed or API timed out)
+      if (candidate == null || job == null) {
+          throw new RuntimeException("AI Extraction Failed"); 
+      }
+      // STEP 3: CALCULATE THE SCORE HERE
+      System.out.println("Calculating Match Score...");
+      return scoringEngine.matchDetailedScore(candidate, job);
+
+
+    }   catch (IOException e) {
+      return null;
+    }
+  }
+}
+package com.bld.ats;
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+
+@SpringBootApplication
+public class AtsApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtsApplication.class, args);
+    }
+}package com.bld.ats.controller;
+
+
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.bld.ats.service.AtsProcessingService;
+import com.bld.ats.scoring.DetailedScore;
+
+@RestController
+@CrossOrigin(origins = "*")
+@RequestMapping("/api/v1/cv")
+public class AtsController {
+
+
+    private final AtsProcessingService atsService = new AtsProcessingService();
+
+    @PostMapping("/analyze")
+    public ResponseEntity<DetailedScore> analyzeCv(@RequestParam("cvFile") MultipartFile cvFile,
+                                                   @RequestParam("jobDescription") String jobDescription) {
+            try{// 3. You just use the instance! No "new" keyword, and no static methods.
+                if (cvFile == null || jobDescription == null) {
+                    return ResponseEntity.badRequest().build();
+                }
+
+                return ResponseEntity.ok(atsService.evaluateCandidate(cvFile, jobDescription));
+            }catch (RuntimeException e) {
+                e.printStackTrace();
+                return ResponseEntity.badRequest().build();
+            }
+
+        }
+
+}
+
+package com.bld.ats.controller;
+
+// This is the entire file! 
+// It perfectly defines the JSON shape we expect from the frontend.
+public record UploadRequest(String cvText, String jobText) {}
+package com.bld.ats.extraction;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import com.bld.ats.model.Candidate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class CandidateInfoExtractor implements InfoExtractor<Candidate> {
+
+    // You get this from the AI provider (e.g., Google AI Studio)
+
+    
+
+    @Override
+    public Candidate extractInfosWithAI(String rawResumeText) {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+            ObjectNode requestBody = objectMapper.createObjectNode();
+
+            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+
+            ObjectNode systemMsg = objectMapper.createObjectNode();
+
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "You are an ATS system. Extract all the information from the following resume text, in a structured way, the response should be ONLY in json format, specificaly in this EXACT format: {\"personalInfo\":{\"fullName\":\"String\",\"email\":\"String or null\",\"phone\":\"String or null\",\"location\":\"String or null\",\"webLinks\":\"Object (Key: String, Value: String) or null\"},\"summary\":\"String\",\"categorizedSkills\":\"Object (Key: String category name, Value: Array of Strings) or null\",\"experience\":[{\"role\":\"String or null\",\"organization\":\"String or null\",\"startDate\":\"String or null\",\"endDate\":\"String or null\",\"description\":\"String\",\"highlights\":[\"String\"]}],\"education\":[{\"degreeOrCertificate\":\"String or null\",\"institution\":\"String\",\"dateRange\":\"String or null\",\"details\":\"Object (Key: String detail name, Value: String) or null\"}],\"projects\":[{\"name\":\"String\",\"description\":\"String\",\"tags\":[\"String\"]}],\"additionalInfo\":\"Object (Key: String category name, Value: Array of Strings) or null\"}. For any field marked as 'Object', you are free to generate the key names based on the candidate's specific profession, but the values MUST strictly follow the specified data type (String or Array of Strings).");
+
+            messages.add(systemMsg);
+
+            ObjectNode exampleUserMsg = objectMapper.createObjectNode();
+
+            exampleUserMsg.put("role", "user");
+            exampleUserMsg.put("content","Contact\nTéléphone\n+212607039162\nEmail\nbouloud94@gmail.com\nAddresse\ncasablanca, oulfa\nExpertise\nCybersécurité\nRéseaux\nC/C++\nPython (pwntools/angr)\nLinux (Fedora/Hyprland)\nGeomatics Engineering\nLaTeX\nBash Scripting\nCréation de contenu technique\nAnalyse stratégique\npython\nLanguage\nAnglais\nArabe\nFrançais\nHobbies\nÉchecs\nCTFs (des challenges en\ncybersecurite)\nProgramming\nBOULOUD MOHAMMED\nStagiaire en Développement\nÉtudiant de 1ère année du cycle d'\''ingénieur en Géomatique et Systèmes d'\''Information (SIG) à\nI'\''EHTP, très motivé, s'\''appuyant sur de solides bases en Mathématiques, Physique et\nInformatique (MIP). Rigoureux, autonome et naturellement curieux, avec une expérience\navérée dans la direction de projets d'\''automatisation et de gestion de bases de données.\nPassionné par la programmation bas niveau, la rétro-ingénierie et l'\''architecture système.\nDésireux d'\''apporter un esprit analytique aiguisé et un solide bagage technique full-stack à\nune équipe de développement dynamique.\nEducation\nÉcole Hassania des Travaux Publics (ЕНТР)\nÉlève ingénieur en 1ère année - SIG\nCours spécialisés en algorithmique avancée, programmation système et géomatique.\nFaculté des Sciences Ain Chock\nDEUG (Bac+2) - Informatique (MIP) | 09/2023 - 09/2025\nÉtudes intensives en Mathématiques, Informatique et Physique.\nFormation axée sur la compréhension approfondie des systèmes informatiques, des algorithmes\net de la programmation logicielle.\nCompétences Techniques\nLangages de Programmation: C/C++, Python, JavaScript, HTML/CSS.\nBas Niveau & Cybersécurité: Rétro-ingénierie, Exploitation de binaires, Shellcode, Gestion de la\nmémoire, GDB, IDA Pro.\nBases de Données & Développement Web: SQL, NoSQL, React, Vue.js, APIs REST.\nSystèmes & Outils: Système d'\''exploitation Linux (Avancé: Fedora, Gestionnaire de fenêtres\nHyprland), Git, Office 365. Outils de Géomatique & Ingénierie: QGIS, Photogrammétrie,\nGéodésie mathématique et physique.\nProjets Techniques & Réalisations\nDéveloppement de jeu en C++:\n이\nDéveloppement d'\''un jeu de plateau Kõnane entièrement fonctionnel à partir de\nzéro en utilisant le C++ avec les bibliothèques ncurses et SDL, améliorant ainsi les\ncompétences en programmation et en gestion de projet.\nCollaboration avec des pairs pour optimiser les mécanismes de jeu, améliorant\nl'\''engagement des utilisateurs et l'\''expérience de jeu globale.\nCybersécurité (CTF):\n• Analyse et exploitation de binaires dans le cadre de défis Capture The Flag (CTF),\nen appliquant des techniques avancées de rétro-ingénierie pour identifier les\nvulnérabilités.\n이 Rédaction de rapports détaillés sur les découvertes, démontrant de solides\ncompétences analytiques nécessaires à l'\''analyse de données et à la sensibilisation\nà la cybersécurité.\n• Géomatique & Analyse SIG:\n이 Réalisation d'\''un mini-projet appliquant les concepts de géodésie physique et\nmathématique et de photogrammétrie à l'\''aide de QGIS, démontrant des\ncompétences en analyse spatiale.\nAutomatisation de bases de données:\n• Direction de projets axés sur l'\''automatisation des flux de travail et l'\''intégration\nde bases de données sécurisées, faisant preuve de leadership dans les pratiques\n이\nde développement logiciel.\nUtilisation de Python pour le développement backend, en adéquation avec\nexigences des stages en développement Python.");
+            
+            messages.add(exampleUserMsg);
+
+            ObjectNode assistantMsg = objectMapper.createObjectNode();
+
+            assistantMsg.put("role", "assistant");
+            assistantMsg.put("content", "{\"personalInfo\":{\"fullName\":\"BOULOUD MOHAMMED\",\"email\":\"bouloud94@gmail.com\",\"phone\":\"+212607039162\",\"location\":\"Casablanca, Oulfa\",\"webLinks\":null},\"summary\":\"Étudiant de 1ère année du cycle d'ingénieur en Géomatique et Systèmes d'Information (SIG) à l'EHTP, très motivé, s'appuyant sur de solides bases en Mathématiques, Physique et Informatique (MIP). Rigoureux, autonome et naturellement curieux, avec une expérience avérée dans la direction de projets d'automatisation et de gestion de bases de données. Passionné par la programmation bas niveau, la rétro-ingénierie et l'architecture système. Désireux d'apporter un esprit analytique aiguisé et un solide bagage technique full-stack à une équipe de développement dynamique.\",\"categorizedSkills\":{\"Langages de Programmation\":[\"C/C++\",\"Python\",\"JavaScript\",\"HTML/CSS\",\"Bash Scripting\",\"LaTeX\"],\"Bas Niveau & Cybersécurité\":[\"Cybersécurité\",\"Rétro-ingénierie\",\"Exploitation de binaires\",\"Shellcode\",\"Gestion de la mémoire\",\"GDB\",\"IDA Pro\",\"pwntools/angr\",\"Réseaux\"],\"Bases de Données & Développement Web\":[\"SQL\",\"NoSQL\",\"React\",\"Vue.js\",\"APIs REST\"],\"Systèmes & Outils\":[\"Linux (Fedora/Hyprland)\",\"Git\",\"Office 365\"],\"Géomatique & Ingénierie\":[\"Geomatics Engineering\",\"QGIS\",\"Photogrammétrie\",\"Géodésie mathématique et physique\"],\"Soft Skills\":[\"Création de contenu technique\",\"Analyse stratégique\",\"Autonomie\",\"Rigueur\",\"Leadership\"]},\"experience\":[{\"role\":\"Stagiaire en Développement\",\"organization\":null,\"startDate\":null,\"endDate\":null,\"description\":\"Direction de projets axés sur l'automatisation des flux de travail et l'intégration de bases de données sécurisées. Utilisation de Python pour le développement backend, en adéquation avec les exigences des stages en développement Python.\",\"highlights\":[\"Automatisation des flux de travail\",\"Intégration de bases de données sécurisées\",\"Développement backend avec Python\"]}],\"education\":[{\"degreeOrCertificate\":\"Élève ingénieur en 1ère année - SIG\",\"institution\":\"École Hassania des Travaux Publics (EHTP)\",\"dateRange\":null,\"details\":{\"Cours Spécialisés\":\"Algorithmique avancée, programmation système et géomatique.\"}},{\"degreeOrCertificate\":\"DEUG (Bac+2) - Informatique (MIP)\",\"institution\":\"Faculté des Sciences Ain Chock\",\"dateRange\":\"09/2023 - 09/2025\",\"details\":{\"Focus\":\"Études intensives en Mathématiques, Informatique et Physique. Compréhension approfondie des systèmes informatiques, des algorithmes et de la programmation logicielle.\"}}],\"projects\":[{\"name\":\"Développement de jeu en C++\",\"description\":\"Développement d'un jeu de plateau Kōnane entièrement fonctionnel à partir de zéro, améliorant les compétences en programmation et en gestion de projet.\",\"tags\":[\"C++\",\"ncurses\",\"SDL\",\"Optimisation\"]},{\"name\":\"Cybersécurité (CTF)\",\"description\":\"Analyse et exploitation de binaires dans le cadre de défis Capture The Flag (CTF). Rédaction de rapports détaillés sur les découvertes.\",\"tags\":[\"Rétro-ingénierie\",\"Vulnérabilités\",\"Analyse de données\"]},{\"name\":\"Géomatique & Analyse SIG\",\"description\":\"Réalisation d'un mini-projet appliquant les concepts de géodésie physique et mathématique et de photogrammétrie à l'aide de QGIS.\",\"tags\":[\"QGIS\",\"Photogrammétrie\",\"Analyse spatiale\"]}],\"additionalInfo\":{\"Languages\":[\"Anglais\",\"Arabe\",\"Français\"],\"Hobbies\":[\"Échecs\",\"CTFs (des challenges en cybersecurite)\",\"Programming\"]}}"
+            );
+
+            messages.add(assistantMsg);
+
+            ObjectNode userMsg = objectMapper.createObjectNode();
+
+            userMsg.put("role", "user");
+            userMsg.put("content", rawResumeText);
+
+            messages.add(userMsg);
+
+
+            requestBody.set("messages", messages);
+
+            requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
+            requestBody.put("temperature", 0);
+            requestBody.put("max_completion_tokens", 1024);
+            requestBody.put("top_p", 1);
+            requestBody.put("stream", false);
+            requestBody.putNull("stop");
+
+            String jsonPayload = objectMapper.writeValueAsString(requestBody);
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + API_KEY)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .build();
+
+            // 4. Send the request and wait for the AI's response
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText(); // Get the content of the AI's response
+            System.out.println(parsedInfo);
+
+            Candidate candidate = objectMapper.readValue(parsedInfo, Candidate.class);
+            // The response will contain the JSON array of skills the AI found!
+            return candidate;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}package com.bld.ats.extraction;
+
+public interface InfoExtractor<extractionType> {
+
+    String API_KEY = System.getenv("GROQ_API_KEY"); 
+    String API_URL = "https://api.groq.com/openai/v1/chat/completions";
+    public extractionType extractInfosWithAI(String prompt);
+}package com.bld.ats.extraction;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import com.bld.ats.model.Job;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class JobInfoExtractor implements InfoExtractor<Job> {
+
+    // You get this from the AI provider (e.g., Google AI Studio)
+
+    @Override
+    public Job extractInfosWithAI(String rawResumeText) {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+            ObjectNode requestBody = objectMapper.createObjectNode();
+
+            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+
+            ObjectNode systemMsg = objectMapper.createObjectNode();
+
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "Extract all the information from the following job description in a structured way, always respond ONLY in a json format in this EXACT format: {\"jobDetails\":{\"title\":\"String\",\"company\":\"String\",\"location\":\"String\",\"employmentType\":\"String (e.g., Full-time, Internship, Contract)\"},\"requirements\":{\"mandatorySkills\":{\"programmingLanguages\":[\"String\"],\"frameworksAndTools\":[\"String\"],\"softSkills\":[\"String\"]},\"niceToHaveSkills\":{\"programmingLanguages\":[\"String\"],\"frameworksAndTools\":[\"String\"],\"softSkills\":[\"String\"]},\"minimumExperienceYears\":\"Integer\",\"minimumEducationLevel\":\"String\"},\"responsibilities\":[\"String\"]}");
+
+            messages.add(systemMsg);
+            
+            ObjectNode exampleUserMsg = objectMapper.createObjectNode();
+
+            exampleUserMsg.put("role", "user");
+            exampleUserMsg.put("content", "Job Posting: Software Engineering Intern (Backend & Security Focus)\n" + //
+                                "Company: CipherTech Systems\n" + //
+                                "Location: Casablanca, Morocco (Hybrid)\n" + //
+                                "About Us:CipherTech Systems is a leading infrastructure and security firm. We build robust backend services and ensure our clients' data is safe from emerging threats. We are looking for an analytical engineering student to join our core backend team for a 4-month internship.\n" + //
+                                "The Role:As a Software Engineering Intern, you will work closely with our backend architecture and security teams. You will help build out RESTful APIs, optimize database queries, and assist in security auditing of our internal systems. The ideal candidate has a hacker mindset, loves the terminal, and writes clean, object-oriented code.\n" + //
+                                "Mandatory Technical Skills:Strong proficiency in Java and backend architecture, Solid understanding of Object-Oriented Programming (OOP) and Data Structures.\n" + //
+                                "Experience with systems-level programming languages, specifically C or C++.\n" + //
+                                "Comfortable working in a Linux environment (command line, bash scripting, system administration).\n" + //
+                                "Familiarity with foundational cybersecurity concepts, reverse engineering, or participation in CTF (Capture The Flag) competitions.\n" + //
+                                "Nice-to-Have Qualifications:\n" + //
+                                "Scripting experience using Python.\n" + //
+                                "Experience building containerized applications using Docker and orchestrating with Kubernetes.\n" + //
+                                "Familiarity with algorithm optimization (e.g., Minimax, pathfinding).\n" + //
+                                "Currently enrolled in an engineering cycle (Cycle Ingénieur) related to computer science, geomatics, or secure systems.\n" + //
+                                "Responsibilities: Develop and maintain Java-based backend services, Perform binary analysis and assist in vulnerability patching, Write secure, efficient, and well-documented code.");
+            messages.add(exampleUserMsg);
+
+            ObjectNode assistantMsg = objectMapper.createObjectNode();
+
+            assistantMsg.put("role", "assistant");
+            assistantMsg.put("content", "{\"jobDetails\":{\"title\":\"Software Engineering Intern\",\"company\":\"CipherTech Systems\",\"location\":\"Casablanca, Morocco (Hybrid)\",\"employmentType\":\"Internship\"},\"requirements\":{\"mandatorySkills\":{\"programmingLanguages\":[\"Java\",\"C\",\"C++\"],\"frameworksAndTools\":[\"Linux\",\"bash scripting\",\"system administration\",\"reverse engineering\",\"CTF (Capture The Flag)\",\"Data Structures\"],\"softSkills\":[\"analytical\",\"hacker mindset\"]},\"niceToHaveSkills\":{\"programmingLanguages\":[\"Python\"],\"frameworksAndTools\":[\"Docker\",\"Kubernetes\",\"algorithm optimization\",\"Minimax\",\"pathfinding\"],\"softSkills\":[]},\"minimumExperienceYears\":0,\"minimumEducationLevel\":\"Cycle Ingénieur (computer science, geomatics, or secure systems)\"},\"responsibilities\":[\"Develop and maintain Java-based backend services.\",\"Perform binary analysis and assist in vulnerability patching.\",\"Write secure, efficient, and well-documented code.\"]}"
+            );
+
+            messages.add(assistantMsg);
+
+            ObjectNode userMsg = objectMapper.createObjectNode();
+
+            userMsg.put("role", "user");
+            userMsg.put("content", rawResumeText);
+
+            messages.add(userMsg);
+            requestBody.set("messages", messages);
+
+            requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
+            requestBody.put("temperature", 0);
+            requestBody.put("max_completion_tokens", 1024);
+            requestBody.put("top_p", 1);
+            requestBody.put("stream", false);
+            requestBody.putNull("stop");
+
+            // ObjectNode compound_custom = objectMapper.createObjectNode();
+            // ArrayNode enabled_tools = objectMapper.createArrayNode();
+            // enabled_tools.add("web_search");
+            // enabled_tools.add("code_interpreter");
+            // enabled_tools.add("visit_website");
+            // compound_custom.set("enabled_tools", enabled_tools);
+            // requestBody.set("compound_custom", compound_custom);
+
+
+
+            
+            String jsonPayload = objectMapper.writeValueAsString(requestBody);
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + API_KEY)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .build();
+
+            // 4. Send the request and wait for the AI's response
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText();
+            System.out.println("Parsed info: " + parsedInfo);
+            Job jobObj = objectMapper.readValue(parsedInfo, Job.class);
+            // The response will contain the JSON array of skills the AI found!
+            return jobObj;
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}package com.bld.ats.model;
+
+import java.util.List;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * A completely generalized Candidate model suitable for any profession.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record Candidate(
+    PersonalInfo personalInfo,
+    String summary,
+    
+    // The ultimate flexible bucket for skills: 
+    // e.g., "Technical" -> ["Java"], "Languages" -> ["French"], "Soft" -> ["Leadership"]
+    Map<String, List<String>> categorizedSkills, 
+    
+    List<Experience> experience,
+    List<Education> education,
+    List<Project> projects,
+    
+    // A catch-all for anything weird or specific the AI finds (certifications, awards, hobbies)
+    Map<String, Object> additionalInfo 
+) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PersonalInfo(
+        String fullName,
+        String email,
+        String phone,
+        String location,
+        
+        // Instead of hardcoding githubUrl or linkedinUrl, we use a map for ALL links
+        // e.g., "LinkedIn" -> "url", "Portfolio" -> "url", "Dribbble" -> "url"
+        Map<String, String> webLinks 
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Experience(
+        String role,          // Generalized from "jobTitle"
+        String organization,  // Generalized from "company" (could be a school, NGO, etc.)
+        String startDate,
+        String endDate,
+        String description,
+        List<String> highlights // Extracted bullet points of achievements
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Education(
+        String degreeOrCertificate,
+        String institution,
+        String dateRange,
+        
+        // Catch-all for things like GPA, Honors, Minors, etc.
+        Map<String, String> details 
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Project(
+        String name,
+        String description,
+        
+        // Generalized from "technologiesUsed". A chef might have "ingredients", a designer "tools".
+        List<String> tags 
+    ) {}
+}package com.bld.ats.model;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * The main root object that holds the entire Job JSON payload.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record Job(
+    JobDetails jobDetails,
+    JobRequirements requirements,
+    List<String> responsibilities
+) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record JobDetails(
+        String title,
+        String company,
+        String location,
+        String employmentType
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record JobRequirements(
+        SkillSet mandatorySkills,
+        SkillSet niceToHaveSkills,
+        int minimumExperienceYears,
+        String minimumEducationLevel
+    ) {}
+
+    /**
+     * Notice how we only have to write this once, but we use it 
+     * for both mandatorySkills AND niceToHaveSkills in the requirements!
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SkillSet(
+        List<String> programmingLanguages,
+        List<String> frameworksAndTools,
+        List<String> softSkills
+    ) {}
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+
+public class CVScoringEngine {
+    
+    private final ScoringStrategy strategy;
+
+    // Default constructor uses the Weighted Priority
+    public CVScoringEngine() {
+        this.strategy = new WeightedPriorityStrategy();
+    }
+
+    // Allows you to inject a different strategy later (e.g., StrictKeywordStrategy)
+    public CVScoringEngine(ScoringStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public double match(Candidate candidate, Job job) {
+        return strategy.calculateScore(candidate, job);
+    }
+
+    public DetailedScore matchDetailedScore(Candidate candidate, Job job) {
+        return strategy.calculateDetailedScore(candidate, job);
+    }
+}package com.bld.ats.scoring;
+
+
+import java.util.List;
+import com.bld.ats.model.Candidate;
+
+public record DetailedScore(
+    int finalScore,
+    int mandatoryScore,
+    int bonusScore,
+    List<String> matchedSkills,
+    List<String> missingSkills,
+    Candidate candidate // Sending the parsed data back to the UI!
+) {}
+package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.model.Job.SkillSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class KeywordMatchStrategy implements ScoringStrategy {
+
+    @Override
+    public double calculateScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return 0;
+        }
+
+        // 1. Extract every single requirement from the Job
+        Set<String> targetKeywords = extractJobKeywords(job);
+        if (targetKeywords.isEmpty()) {
+            return 100; // No requirements means instant match
+        }
+
+        // 2. Build a massive "Corpus" (a giant string) of everything the candidate wrote
+        String candidateCorpus = buildCandidateCorpus(candidate).toLowerCase();
+
+        // 3. Count how many keywords appear in the corpus
+        int matches = 0;
+        for (String keyword : targetKeywords) {
+            // We pad with spaces to avoid accidental substring matches 
+            // e.g., finding "C" inside "React"
+            if (candidateCorpus.contains(" " + keyword.toLowerCase() + " ") || 
+                candidateCorpus.contains(keyword.toLowerCase())) { 
+                matches++;
+            }
+        }
+
+        // 4. Calculate percentage
+        double score = (double) matches / targetKeywords.size();
+        return Math.round(score * 100);
+    }
+
+    @Override
+    public DetailedScore calculateDetailedScore(Candidate candidate, Job job) {
+        return null;
+    }
+    /**
+     * Grabs all mandatory and nice-to-have skills from the job description.
+     */
+    private Set<String> extractJobKeywords(Job job) {
+        Set<String> keywords = new HashSet<>();
+        
+        // Helper lambda/method to safely add skills
+        addSkillsToSet(keywords, job.requirements().mandatorySkills());
+        addSkillsToSet(keywords, job.requirements().niceToHaveSkills());
+        
+        return keywords;
+    }
+
+    private void addSkillsToSet(Set<String> set, SkillSet skillSet) {
+        if (skillSet == null) return;
+        if (skillSet.programmingLanguages() != null) set.addAll(skillSet.programmingLanguages());
+        if (skillSet.frameworksAndTools() != null) set.addAll(skillSet.frameworksAndTools());
+        if (skillSet.softSkills() != null) set.addAll(skillSet.softSkills());
+    }
+
+    /**
+     * Smashes all candidate data into one massive, searchable string block.
+     */
+    private String buildCandidateCorpus(Candidate candidate) {
+        StringBuilder corpus = new StringBuilder();
+
+        if (candidate.summary() != null) {
+            corpus.append(candidate.summary()).append(" ");
+        }
+
+        // Add Skills
+        if (candidate.categorizedSkills() != null) {
+            for (List<String> skills : candidate.categorizedSkills().values()) {
+                if (skills != null) {
+                    corpus.append(String.join(" ", skills)).append(" ");
+                }
+            }
+        }
+
+        // Add Experience Descriptions
+        if (candidate.experience() != null) {
+            for (Candidate.Experience exp : candidate.experience()) {
+                if (exp.description() != null) corpus.append(exp.description()).append(" ");
+                if (exp.highlights() != null) corpus.append(String.join(" ", exp.highlights())).append(" ");
+            }
+        }
+
+        // Add Project Descriptions and Tags
+        if (candidate.projects() != null) {
+            for (Candidate.Project proj : candidate.projects()) {
+                if (proj.description() != null) corpus.append(proj.description()).append(" ");
+                if (proj.tags() != null) corpus.append(String.join(" ", proj.tags())).append(" ");
+            }
+        }
+
+        return corpus.toString();
+    }
+
+
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+
+public interface ScoringStrategy {
+    // Takes the candidate's profile and the target job description, returns a score 0-100
+    double calculateScore(Candidate candidate, Job job);
+    DetailedScore calculateDetailedScore(Candidate candidate, Job job);
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.model.Job.SkillSet;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class WeightedPriorityStrategy implements ScoringStrategy {
+
+    private static final double MANDATORY_WEIGHT = 0.70;
+    private static final double NICE_TO_HAVE_WEIGHT = 0.30;
+
+    @Override
+    public double calculateScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return 0;
+        }
+
+        // 1. Flatten all candidate skills into a single searchable pool
+        Set<String> candidateSkillPool = extractCandidateSkills(candidate);
+
+        // 2. Calculate percentages for both requirement categories
+        double mandatoryScore = calculateCategoryMatch(
+                job.requirements().mandatorySkills(), candidateSkillPool);
+                
+        double niceToHaveScore = calculateCategoryMatch(
+                job.requirements().niceToHaveSkills(), candidateSkillPool);
+
+        // 3. Apply weights and calculate final score (out of 100)
+        double finalScore = (mandatoryScore * MANDATORY_WEIGHT) + (niceToHaveScore * NICE_TO_HAVE_WEIGHT);
+        
+        return  Math.round(finalScore * 100);
+    }
+
+    /**
+     * Digs through the candidate's dynamic map and project tags to build a master list of skills.
+     */
+    private Set<String> extractCandidateSkills(Candidate candidate) {
+        Set<String> pool = new HashSet<>();
+
+        // Add all categorized skills
+        if (candidate.categorizedSkills() != null) {
+            for (List<String> skillList : candidate.categorizedSkills().values()) {
+                if (skillList != null) {
+                    for (String skill : skillList) {
+                        pool.add(skill.toLowerCase().trim());
+                    }
+                }
+            }
+        }
+
+        // Add project tags as a backup (e.g., if they used "Docker" in a project but forgot to list it in skills)
+        if (candidate.projects() != null) {
+            for (Candidate.Project project : candidate.projects()) {
+                if (project.tags() != null) {
+                    for (String tag : project.tags()) {
+                        pool.add(tag.toLowerCase().trim());
+                    }
+                }
+            }
+        }
+
+        return pool;
+    }
+
+    /**
+     * Compares the Job's rigid SkillSet against the Candidate's flattened skill pool.
+     */
+    private double calculateCategoryMatch(SkillSet requiredSkills, Set<String> candidatePool) {
+        if (requiredSkills == null) return 0.0;
+
+        // Combine all required skills from this specific Job SkillSet
+        List<String> allRequired = new ArrayList<>();
+        if (requiredSkills.programmingLanguages() != null) allRequired.addAll(requiredSkills.programmingLanguages());
+        if (requiredSkills.frameworksAndTools() != null) allRequired.addAll(requiredSkills.frameworksAndTools());
+        if (requiredSkills.softSkills() != null) allRequired.addAll(requiredSkills.softSkills());
+
+        if (allRequired.isEmpty()) return 1.0; // If they don't require anything, it's an automatic 100% match
+
+        int matchCount = 0;
+
+        for (String requirement : allRequired) {
+            if (isSkillPresent(requirement, candidatePool)) {
+                matchCount++;
+            }
+        }
+
+        return (double) matchCount / allRequired.size();
+    }
+
+    /**
+     * Helper method to do "fuzzy" string matching.
+     */
+    private boolean isSkillPresent(String requirement, Set<String> candidatePool) {
+        String reqLower = requirement.toLowerCase().trim();
+
+        for (String candidateSkill : candidatePool) {
+            // Check for exact match OR if one string is inside the other
+            // Example: requirement="React", candidateSkill="React.js" -> Match!
+            if (candidateSkill.equals(reqLower) || 
+                candidateSkill.contains(reqLower) || 
+                reqLower.contains(candidateSkill)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    @Override
+    public 
+    DetailedScore calculateDetailedScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return new DetailedScore(0, 0, 0, new ArrayList<>(), new ArrayList<>(), null);
+        }
+
+        Set<String> candidateSkillPool = extractCandidateSkills(candidate);
+
+        // Track exactly what they have and what they are missing
+        List<String> matchedSkills = new ArrayList<>();
+        List<String> missingSkills = new ArrayList<>();
+
+        // Analyze Mandatory Skills
+        double mandatoryScore = analyzeCategory(
+                job.requirements().mandatorySkills(), candidateSkillPool, matchedSkills, missingSkills);
+                
+        // Analyze Nice-To-Have Skills
+        double niceToHaveScore = analyzeCategory(
+                job.requirements().niceToHaveSkills(), candidateSkillPool, matchedSkills, missingSkills);
+
+        // Math
+        double finalScore = (mandatoryScore * MANDATORY_WEIGHT) + (niceToHaveScore * NICE_TO_HAVE_WEIGHT);
+        int finalScoreInt = (int) Math.round(finalScore * 100);
+
+        return new DetailedScore(
+                finalScoreInt, 
+                (int) Math.round(mandatoryScore * 100), 
+                (int) Math.round(niceToHaveScore * 100), 
+                matchedSkills, 
+                missingSkills,
+                candidate
+        );
+    }
+    /**
+     * Helper method to analyze a specific category and populate our lists.
+     */
+    private double analyzeCategory(SkillSet requiredSkills, 
+                                   Set<String> candidatePool, 
+                                   List<String> matchedSkills, 
+                                   List<String> missingSkills) {
+        if (requiredSkills == null) return 0.0;
+
+        List<String> allRequired = new ArrayList<>();
+        if (requiredSkills.programmingLanguages() != null) allRequired.addAll(requiredSkills.programmingLanguages());
+        if (requiredSkills.frameworksAndTools() != null) allRequired.addAll(requiredSkills.frameworksAndTools());
+        if (requiredSkills.softSkills() != null) allRequired.addAll(requiredSkills.softSkills());
+
+        if (allRequired.isEmpty()) return 1.0;
+
+        int matchCount = 0;
+
+        for (String requirement : allRequired) {
+            if (isSkillPresent(requirement, candidatePool)) {
+                matchCount++;
+                matchedSkills.add(requirement);
+            } else {
+                missingSkills.add(requirement);
+            }
+        }
+
+        return (double) matchCount / allRequired.size();
+    }
+}
+package com.bld.ats.service;
+
+import java.io.IOException;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.bld.ats.extraction.CandidateInfoExtractor;
+import com.bld.ats.extraction.JobInfoExtractor;
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.scoring.CVScoringEngine;
+import com.bld.ats.scoring.DetailedScore;
+import com.bld.ats.scoring.WeightedPriorityStrategy;
+
+
+public class AtsProcessingService {
+  private final CandidateInfoExtractor candidateExtractor;
+  private final JobInfoExtractor jobExtractor;
+  private final CVScoringEngine scoringEngine;
+
+  public AtsProcessingService() {
+      this.candidateExtractor = new CandidateInfoExtractor();
+      this.jobExtractor = new JobInfoExtractor();
+      
+      // We inject our smart strategy here! 
+      // If you ever want to change how the ATS scores, you ONLY change this one line.
+      this.scoringEngine = new CVScoringEngine(new WeightedPriorityStrategy());
+  }
+
+  public DetailedScore evaluateCandidate(MultipartFile cvFile, String rawJobDescriptionText) {
+      try (PDDocument document = Loader.loadPDF(cvFile.getInputStream().readAllBytes())) {
+      PDFTextStripper stripper = new PDFTextStripper();
+      String rawCvText = stripper.getText(document);
+      
+
+      // STEP 1: Extract the data using AI (The API Calls)
+      System.out.println("Extracting Candidate Data...");
+      Candidate candidate = candidateExtractor.extractInfosWithAI(rawCvText);
+      
+      System.out.println("Extracting Job Data...");
+      Job job = jobExtractor.extractInfosWithAI(rawJobDescriptionText);
+
+      // STEP 2: Safety Check (If the AI failed or API timed out)
+      if (candidate == null || job == null) {
+          throw new RuntimeException("AI Extraction Failed"); 
+      }
+      // STEP 3: CALCULATE THE SCORE HERE
+      System.out.println("Calculating Match Score...");
+      return scoringEngine.matchDetailedScore(candidate, job);
+
+
+    }   catch (IOException e) {
+      return null;
+    }
+  }
+}
+package com.bld.ats;
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+
+@SpringBootApplication
+public class AtsApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AtsApplication.class, args);
+    }
+}package com.bld.ats.controller;
+
+
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.bld.ats.service.AtsProcessingService;
+import com.bld.ats.scoring.DetailedScore;
+
+@RestController
+@CrossOrigin(origins = "*")
+@RequestMapping("/api/v1/cv")
+public class AtsController {
+
+
+    private final AtsProcessingService atsService = new AtsProcessingService();
+
+    @PostMapping("/analyze")
+    public ResponseEntity<DetailedScore> analyzeCv(@RequestParam("cvFile") MultipartFile cvFile,
+                                                   @RequestParam("jobDescription") String jobDescription) {
+            try{// 3. You just use the instance! No "new" keyword, and no static methods.
+                if (cvFile == null || jobDescription == null) {
+                    return ResponseEntity.badRequest().build();
+                }
+
+                return ResponseEntity.ok(atsService.evaluateCandidate(cvFile, jobDescription));
+            }catch (RuntimeException e) {
+                e.printStackTrace();
+                return ResponseEntity.badRequest().build();
+            }
+
+        }
+
+}
+
+package com.bld.ats.controller;
+
+// This is the entire file! 
+// It perfectly defines the JSON shape we expect from the frontend.
+public record UploadRequest(String cvText, String jobText) {}
+package com.bld.ats.extraction;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import com.bld.ats.model.Candidate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class CandidateInfoExtractor implements InfoExtractor<Candidate> {
+
+    // You get this from the AI provider (e.g., Google AI Studio)
+
+    
+
+    @Override
+    public Candidate extractInfosWithAI(String rawResumeText) {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+            ObjectNode requestBody = objectMapper.createObjectNode();
+
+            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+
+            ObjectNode systemMsg = objectMapper.createObjectNode();
+
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "You are an ATS system. Extract all the information from the following resume text, in a structured way, the response should be ONLY in json format, specificaly in this EXACT format: {\"personalInfo\":{\"fullName\":\"String\",\"email\":\"String or null\",\"phone\":\"String or null\",\"location\":\"String or null\",\"webLinks\":\"Object (Key: String, Value: String) or null\"},\"summary\":\"String\",\"categorizedSkills\":\"Object (Key: String category name, Value: Array of Strings) or null\",\"experience\":[{\"role\":\"String or null\",\"organization\":\"String or null\",\"startDate\":\"String or null\",\"endDate\":\"String or null\",\"description\":\"String\",\"highlights\":[\"String\"]}],\"education\":[{\"degreeOrCertificate\":\"String or null\",\"institution\":\"String\",\"dateRange\":\"String or null\",\"details\":\"Object (Key: String detail name, Value: String) or null\"}],\"projects\":[{\"name\":\"String\",\"description\":\"String\",\"tags\":[\"String\"]}],\"additionalInfo\":\"Object (Key: String category name, Value: Array of Strings) or null\"}. For any field marked as 'Object', you are free to generate the key names based on the candidate's specific profession, but the values MUST strictly follow the specified data type (String or Array of Strings).");
+
+            messages.add(systemMsg);
+
+            ObjectNode exampleUserMsg = objectMapper.createObjectNode();
+
+            exampleUserMsg.put("role", "user");
+            exampleUserMsg.put("content","Contact\nTéléphone\n+212607039162\nEmail\nbouloud94@gmail.com\nAddresse\ncasablanca, oulfa\nExpertise\nCybersécurité\nRéseaux\nC/C++\nPython (pwntools/angr)\nLinux (Fedora/Hyprland)\nGeomatics Engineering\nLaTeX\nBash Scripting\nCréation de contenu technique\nAnalyse stratégique\npython\nLanguage\nAnglais\nArabe\nFrançais\nHobbies\nÉchecs\nCTFs (des challenges en\ncybersecurite)\nProgramming\nBOULOUD MOHAMMED\nStagiaire en Développement\nÉtudiant de 1ère année du cycle d'\''ingénieur en Géomatique et Systèmes d'\''Information (SIG) à\nI'\''EHTP, très motivé, s'\''appuyant sur de solides bases en Mathématiques, Physique et\nInformatique (MIP). Rigoureux, autonome et naturellement curieux, avec une expérience\navérée dans la direction de projets d'\''automatisation et de gestion de bases de données.\nPassionné par la programmation bas niveau, la rétro-ingénierie et l'\''architecture système.\nDésireux d'\''apporter un esprit analytique aiguisé et un solide bagage technique full-stack à\nune équipe de développement dynamique.\nEducation\nÉcole Hassania des Travaux Publics (ЕНТР)\nÉlève ingénieur en 1ère année - SIG\nCours spécialisés en algorithmique avancée, programmation système et géomatique.\nFaculté des Sciences Ain Chock\nDEUG (Bac+2) - Informatique (MIP) | 09/2023 - 09/2025\nÉtudes intensives en Mathématiques, Informatique et Physique.\nFormation axée sur la compréhension approfondie des systèmes informatiques, des algorithmes\net de la programmation logicielle.\nCompétences Techniques\nLangages de Programmation: C/C++, Python, JavaScript, HTML/CSS.\nBas Niveau & Cybersécurité: Rétro-ingénierie, Exploitation de binaires, Shellcode, Gestion de la\nmémoire, GDB, IDA Pro.\nBases de Données & Développement Web: SQL, NoSQL, React, Vue.js, APIs REST.\nSystèmes & Outils: Système d'\''exploitation Linux (Avancé: Fedora, Gestionnaire de fenêtres\nHyprland), Git, Office 365. Outils de Géomatique & Ingénierie: QGIS, Photogrammétrie,\nGéodésie mathématique et physique.\nProjets Techniques & Réalisations\nDéveloppement de jeu en C++:\n이\nDéveloppement d'\''un jeu de plateau Kõnane entièrement fonctionnel à partir de\nzéro en utilisant le C++ avec les bibliothèques ncurses et SDL, améliorant ainsi les\ncompétences en programmation et en gestion de projet.\nCollaboration avec des pairs pour optimiser les mécanismes de jeu, améliorant\nl'\''engagement des utilisateurs et l'\''expérience de jeu globale.\nCybersécurité (CTF):\n• Analyse et exploitation de binaires dans le cadre de défis Capture The Flag (CTF),\nen appliquant des techniques avancées de rétro-ingénierie pour identifier les\nvulnérabilités.\n이 Rédaction de rapports détaillés sur les découvertes, démontrant de solides\ncompétences analytiques nécessaires à l'\''analyse de données et à la sensibilisation\nà la cybersécurité.\n• Géomatique & Analyse SIG:\n이 Réalisation d'\''un mini-projet appliquant les concepts de géodésie physique et\nmathématique et de photogrammétrie à l'\''aide de QGIS, démontrant des\ncompétences en analyse spatiale.\nAutomatisation de bases de données:\n• Direction de projets axés sur l'\''automatisation des flux de travail et l'\''intégration\nde bases de données sécurisées, faisant preuve de leadership dans les pratiques\n이\nde développement logiciel.\nUtilisation de Python pour le développement backend, en adéquation avec\nexigences des stages en développement Python.");
+            
+            messages.add(exampleUserMsg);
+
+            ObjectNode assistantMsg = objectMapper.createObjectNode();
+
+            assistantMsg.put("role", "assistant");
+            assistantMsg.put("content", "{\"personalInfo\":{\"fullName\":\"BOULOUD MOHAMMED\",\"email\":\"bouloud94@gmail.com\",\"phone\":\"+212607039162\",\"location\":\"Casablanca, Oulfa\",\"webLinks\":null},\"summary\":\"Étudiant de 1ère année du cycle d'ingénieur en Géomatique et Systèmes d'Information (SIG) à l'EHTP, très motivé, s'appuyant sur de solides bases en Mathématiques, Physique et Informatique (MIP). Rigoureux, autonome et naturellement curieux, avec une expérience avérée dans la direction de projets d'automatisation et de gestion de bases de données. Passionné par la programmation bas niveau, la rétro-ingénierie et l'architecture système. Désireux d'apporter un esprit analytique aiguisé et un solide bagage technique full-stack à une équipe de développement dynamique.\",\"categorizedSkills\":{\"Langages de Programmation\":[\"C/C++\",\"Python\",\"JavaScript\",\"HTML/CSS\",\"Bash Scripting\",\"LaTeX\"],\"Bas Niveau & Cybersécurité\":[\"Cybersécurité\",\"Rétro-ingénierie\",\"Exploitation de binaires\",\"Shellcode\",\"Gestion de la mémoire\",\"GDB\",\"IDA Pro\",\"pwntools/angr\",\"Réseaux\"],\"Bases de Données & Développement Web\":[\"SQL\",\"NoSQL\",\"React\",\"Vue.js\",\"APIs REST\"],\"Systèmes & Outils\":[\"Linux (Fedora/Hyprland)\",\"Git\",\"Office 365\"],\"Géomatique & Ingénierie\":[\"Geomatics Engineering\",\"QGIS\",\"Photogrammétrie\",\"Géodésie mathématique et physique\"],\"Soft Skills\":[\"Création de contenu technique\",\"Analyse stratégique\",\"Autonomie\",\"Rigueur\",\"Leadership\"]},\"experience\":[{\"role\":\"Stagiaire en Développement\",\"organization\":null,\"startDate\":null,\"endDate\":null,\"description\":\"Direction de projets axés sur l'automatisation des flux de travail et l'intégration de bases de données sécurisées. Utilisation de Python pour le développement backend, en adéquation avec les exigences des stages en développement Python.\",\"highlights\":[\"Automatisation des flux de travail\",\"Intégration de bases de données sécurisées\",\"Développement backend avec Python\"]}],\"education\":[{\"degreeOrCertificate\":\"Élève ingénieur en 1ère année - SIG\",\"institution\":\"École Hassania des Travaux Publics (EHTP)\",\"dateRange\":null,\"details\":{\"Cours Spécialisés\":\"Algorithmique avancée, programmation système et géomatique.\"}},{\"degreeOrCertificate\":\"DEUG (Bac+2) - Informatique (MIP)\",\"institution\":\"Faculté des Sciences Ain Chock\",\"dateRange\":\"09/2023 - 09/2025\",\"details\":{\"Focus\":\"Études intensives en Mathématiques, Informatique et Physique. Compréhension approfondie des systèmes informatiques, des algorithmes et de la programmation logicielle.\"}}],\"projects\":[{\"name\":\"Développement de jeu en C++\",\"description\":\"Développement d'un jeu de plateau Kōnane entièrement fonctionnel à partir de zéro, améliorant les compétences en programmation et en gestion de projet.\",\"tags\":[\"C++\",\"ncurses\",\"SDL\",\"Optimisation\"]},{\"name\":\"Cybersécurité (CTF)\",\"description\":\"Analyse et exploitation de binaires dans le cadre de défis Capture The Flag (CTF). Rédaction de rapports détaillés sur les découvertes.\",\"tags\":[\"Rétro-ingénierie\",\"Vulnérabilités\",\"Analyse de données\"]},{\"name\":\"Géomatique & Analyse SIG\",\"description\":\"Réalisation d'un mini-projet appliquant les concepts de géodésie physique et mathématique et de photogrammétrie à l'aide de QGIS.\",\"tags\":[\"QGIS\",\"Photogrammétrie\",\"Analyse spatiale\"]}],\"additionalInfo\":{\"Languages\":[\"Anglais\",\"Arabe\",\"Français\"],\"Hobbies\":[\"Échecs\",\"CTFs (des challenges en cybersecurite)\",\"Programming\"]}}"
+            );
+
+            messages.add(assistantMsg);
+
+            ObjectNode userMsg = objectMapper.createObjectNode();
+
+            userMsg.put("role", "user");
+            userMsg.put("content", rawResumeText);
+
+            messages.add(userMsg);
+
+
+            requestBody.set("messages", messages);
+
+            requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
+            requestBody.put("temperature", 0);
+            requestBody.put("max_completion_tokens", 1024);
+            requestBody.put("top_p", 1);
+            requestBody.put("stream", false);
+            requestBody.putNull("stop");
+
+            String jsonPayload = objectMapper.writeValueAsString(requestBody);
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + API_KEY)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .build();
+
+            // 4. Send the request and wait for the AI's response
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText(); // Get the content of the AI's response
+            System.out.println(parsedInfo);
+
+            Candidate candidate = objectMapper.readValue(parsedInfo, Candidate.class);
+            // The response will contain the JSON array of skills the AI found!
+            return candidate;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}package com.bld.ats.extraction;
+
+public interface InfoExtractor<extractionType> {
+
+    String API_KEY = System.getenv("GROQ_API_KEY"); 
+    String API_URL = "https://api.groq.com/openai/v1/chat/completions";
+    public extractionType extractInfosWithAI(String prompt);
+}package com.bld.ats.extraction;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import com.bld.ats.model.Job;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public class JobInfoExtractor implements InfoExtractor<Job> {
+
+    // You get this from the AI provider (e.g., Google AI Studio)
+
+    @Override
+    public Job extractInfosWithAI(String rawResumeText) {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        try {
+
+            ObjectNode requestBody = objectMapper.createObjectNode();
+
+            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+
+            ObjectNode systemMsg = objectMapper.createObjectNode();
+
+            systemMsg.put("role", "system");
+            systemMsg.put("content", "Extract all the information from the following job description in a structured way, always respond ONLY in a json format in this EXACT format: {\"jobDetails\":{\"title\":\"String\",\"company\":\"String\",\"location\":\"String\",\"employmentType\":\"String (e.g., Full-time, Internship, Contract)\"},\"requirements\":{\"mandatorySkills\":{\"programmingLanguages\":[\"String\"],\"frameworksAndTools\":[\"String\"],\"softSkills\":[\"String\"]},\"niceToHaveSkills\":{\"programmingLanguages\":[\"String\"],\"frameworksAndTools\":[\"String\"],\"softSkills\":[\"String\"]},\"minimumExperienceYears\":\"Integer\",\"minimumEducationLevel\":\"String\"},\"responsibilities\":[\"String\"]}");
+
+            messages.add(systemMsg);
+            
+            ObjectNode exampleUserMsg = objectMapper.createObjectNode();
+
+            exampleUserMsg.put("role", "user");
+            exampleUserMsg.put("content", "Job Posting: Software Engineering Intern (Backend & Security Focus)\n" + //
+                                "Company: CipherTech Systems\n" + //
+                                "Location: Casablanca, Morocco (Hybrid)\n" + //
+                                "About Us:CipherTech Systems is a leading infrastructure and security firm. We build robust backend services and ensure our clients' data is safe from emerging threats. We are looking for an analytical engineering student to join our core backend team for a 4-month internship.\n" + //
+                                "The Role:As a Software Engineering Intern, you will work closely with our backend architecture and security teams. You will help build out RESTful APIs, optimize database queries, and assist in security auditing of our internal systems. The ideal candidate has a hacker mindset, loves the terminal, and writes clean, object-oriented code.\n" + //
+                                "Mandatory Technical Skills:Strong proficiency in Java and backend architecture, Solid understanding of Object-Oriented Programming (OOP) and Data Structures.\n" + //
+                                "Experience with systems-level programming languages, specifically C or C++.\n" + //
+                                "Comfortable working in a Linux environment (command line, bash scripting, system administration).\n" + //
+                                "Familiarity with foundational cybersecurity concepts, reverse engineering, or participation in CTF (Capture The Flag) competitions.\n" + //
+                                "Nice-to-Have Qualifications:\n" + //
+                                "Scripting experience using Python.\n" + //
+                                "Experience building containerized applications using Docker and orchestrating with Kubernetes.\n" + //
+                                "Familiarity with algorithm optimization (e.g., Minimax, pathfinding).\n" + //
+                                "Currently enrolled in an engineering cycle (Cycle Ingénieur) related to computer science, geomatics, or secure systems.\n" + //
+                                "Responsibilities: Develop and maintain Java-based backend services, Perform binary analysis and assist in vulnerability patching, Write secure, efficient, and well-documented code.");
+            messages.add(exampleUserMsg);
+
+            ObjectNode assistantMsg = objectMapper.createObjectNode();
+
+            assistantMsg.put("role", "assistant");
+            assistantMsg.put("content", "{\"jobDetails\":{\"title\":\"Software Engineering Intern\",\"company\":\"CipherTech Systems\",\"location\":\"Casablanca, Morocco (Hybrid)\",\"employmentType\":\"Internship\"},\"requirements\":{\"mandatorySkills\":{\"programmingLanguages\":[\"Java\",\"C\",\"C++\"],\"frameworksAndTools\":[\"Linux\",\"bash scripting\",\"system administration\",\"reverse engineering\",\"CTF (Capture The Flag)\",\"Data Structures\"],\"softSkills\":[\"analytical\",\"hacker mindset\"]},\"niceToHaveSkills\":{\"programmingLanguages\":[\"Python\"],\"frameworksAndTools\":[\"Docker\",\"Kubernetes\",\"algorithm optimization\",\"Minimax\",\"pathfinding\"],\"softSkills\":[]},\"minimumExperienceYears\":0,\"minimumEducationLevel\":\"Cycle Ingénieur (computer science, geomatics, or secure systems)\"},\"responsibilities\":[\"Develop and maintain Java-based backend services.\",\"Perform binary analysis and assist in vulnerability patching.\",\"Write secure, efficient, and well-documented code.\"]}"
+            );
+
+            messages.add(assistantMsg);
+
+            ObjectNode userMsg = objectMapper.createObjectNode();
+
+            userMsg.put("role", "user");
+            userMsg.put("content", rawResumeText);
+
+            messages.add(userMsg);
+            requestBody.set("messages", messages);
+
+            requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
+            requestBody.put("temperature", 0);
+            requestBody.put("max_completion_tokens", 1024);
+            requestBody.put("top_p", 1);
+            requestBody.put("stream", false);
+            requestBody.putNull("stop");
+
+            // ObjectNode compound_custom = objectMapper.createObjectNode();
+            // ArrayNode enabled_tools = objectMapper.createArrayNode();
+            // enabled_tools.add("web_search");
+            // enabled_tools.add("code_interpreter");
+            // enabled_tools.add("visit_website");
+            // compound_custom.set("enabled_tools", enabled_tools);
+            // requestBody.set("compound_custom", compound_custom);
+
+
+
+            
+            String jsonPayload = objectMapper.writeValueAsString(requestBody);
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_URL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + API_KEY)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .build();
+
+            // 4. Send the request and wait for the AI's response
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText();
+            System.out.println("Parsed info: " + parsedInfo);
+            Job jobObj = objectMapper.readValue(parsedInfo, Job.class);
+            // The response will contain the JSON array of skills the AI found!
+            return jobObj;
+
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}package com.bld.ats.model;
+
+import java.util.List;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * A completely generalized Candidate model suitable for any profession.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record Candidate(
+    PersonalInfo personalInfo,
+    String summary,
+    
+    // The ultimate flexible bucket for skills: 
+    // e.g., "Technical" -> ["Java"], "Languages" -> ["French"], "Soft" -> ["Leadership"]
+    Map<String, List<String>> categorizedSkills, 
+    
+    List<Experience> experience,
+    List<Education> education,
+    List<Project> projects,
+    
+    // A catch-all for anything weird or specific the AI finds (certifications, awards, hobbies)
+    Map<String, Object> additionalInfo 
+) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record PersonalInfo(
+        String fullName,
+        String email,
+        String phone,
+        String location,
+        
+        // Instead of hardcoding githubUrl or linkedinUrl, we use a map for ALL links
+        // e.g., "LinkedIn" -> "url", "Portfolio" -> "url", "Dribbble" -> "url"
+        Map<String, String> webLinks 
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Experience(
+        String role,          // Generalized from "jobTitle"
+        String organization,  // Generalized from "company" (could be a school, NGO, etc.)
+        String startDate,
+        String endDate,
+        String description,
+        List<String> highlights // Extracted bullet points of achievements
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Education(
+        String degreeOrCertificate,
+        String institution,
+        String dateRange,
+        
+        // Catch-all for things like GPA, Honors, Minors, etc.
+        Map<String, String> details 
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Project(
+        String name,
+        String description,
+        
+        // Generalized from "technologiesUsed". A chef might have "ingredients", a designer "tools".
+        List<String> tags 
+    ) {}
+}package com.bld.ats.model;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * The main root object that holds the entire Job JSON payload.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record Job(
+    JobDetails jobDetails,
+    JobRequirements requirements,
+    List<String> responsibilities
+) {
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record JobDetails(
+        String title,
+        String company,
+        String location,
+        String employmentType
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record JobRequirements(
+        SkillSet mandatorySkills,
+        SkillSet niceToHaveSkills,
+        int minimumExperienceYears,
+        String minimumEducationLevel
+    ) {}
+
+    /**
+     * Notice how we only have to write this once, but we use it 
+     * for both mandatorySkills AND niceToHaveSkills in the requirements!
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SkillSet(
+        List<String> programmingLanguages,
+        List<String> frameworksAndTools,
+        List<String> softSkills
+    ) {}
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+
+public class CVScoringEngine {
+    
+    private final ScoringStrategy strategy;
+
+    // Default constructor uses the Weighted Priority
+    public CVScoringEngine() {
+        this.strategy = new WeightedPriorityStrategy();
+    }
+
+    // Allows you to inject a different strategy later (e.g., StrictKeywordStrategy)
+    public CVScoringEngine(ScoringStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public double match(Candidate candidate, Job job) {
+        return strategy.calculateScore(candidate, job);
+    }
+
+    public DetailedScore matchDetailedScore(Candidate candidate, Job job) {
+        return strategy.calculateDetailedScore(candidate, job);
+    }
+}package com.bld.ats.scoring;
+
+
+import java.util.List;
+import com.bld.ats.model.Candidate;
+
+public record DetailedScore(
+    int finalScore,
+    int mandatoryScore,
+    int bonusScore,
+    List<String> matchedSkills,
+    List<String> missingSkills,
+    Candidate candidate // Sending the parsed data back to the UI!
+) {}
+package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.model.Job.SkillSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class KeywordMatchStrategy implements ScoringStrategy {
+
+    @Override
+    public double calculateScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return 0;
+        }
+
+        // 1. Extract every single requirement from the Job
+        Set<String> targetKeywords = extractJobKeywords(job);
+        if (targetKeywords.isEmpty()) {
+            return 100; // No requirements means instant match
+        }
+
+        // 2. Build a massive "Corpus" (a giant string) of everything the candidate wrote
+        String candidateCorpus = buildCandidateCorpus(candidate).toLowerCase();
+
+        // 3. Count how many keywords appear in the corpus
+        int matches = 0;
+        for (String keyword : targetKeywords) {
+            // We pad with spaces to avoid accidental substring matches 
+            // e.g., finding "C" inside "React"
+            if (candidateCorpus.contains(" " + keyword.toLowerCase() + " ") || 
+                candidateCorpus.contains(keyword.toLowerCase())) { 
+                matches++;
+            }
+        }
+
+        // 4. Calculate percentage
+        double score = (double) matches / targetKeywords.size();
+        return Math.round(score * 100);
+    }
+
+    @Override
+    public DetailedScore calculateDetailedScore(Candidate candidate, Job job) {
+        return null;
+    }
+    /**
+     * Grabs all mandatory and nice-to-have skills from the job description.
+     */
+    private Set<String> extractJobKeywords(Job job) {
+        Set<String> keywords = new HashSet<>();
+        
+        // Helper lambda/method to safely add skills
+        addSkillsToSet(keywords, job.requirements().mandatorySkills());
+        addSkillsToSet(keywords, job.requirements().niceToHaveSkills());
+        
+        return keywords;
+    }
+
+    private void addSkillsToSet(Set<String> set, SkillSet skillSet) {
+        if (skillSet == null) return;
+        if (skillSet.programmingLanguages() != null) set.addAll(skillSet.programmingLanguages());
+        if (skillSet.frameworksAndTools() != null) set.addAll(skillSet.frameworksAndTools());
+        if (skillSet.softSkills() != null) set.addAll(skillSet.softSkills());
+    }
+
+    /**
+     * Smashes all candidate data into one massive, searchable string block.
+     */
+    private String buildCandidateCorpus(Candidate candidate) {
+        StringBuilder corpus = new StringBuilder();
+
+        if (candidate.summary() != null) {
+            corpus.append(candidate.summary()).append(" ");
+        }
+
+        // Add Skills
+        if (candidate.categorizedSkills() != null) {
+            for (List<String> skills : candidate.categorizedSkills().values()) {
+                if (skills != null) {
+                    corpus.append(String.join(" ", skills)).append(" ");
+                }
+            }
+        }
+
+        // Add Experience Descriptions
+        if (candidate.experience() != null) {
+            for (Candidate.Experience exp : candidate.experience()) {
+                if (exp.description() != null) corpus.append(exp.description()).append(" ");
+                if (exp.highlights() != null) corpus.append(String.join(" ", exp.highlights())).append(" ");
+            }
+        }
+
+        // Add Project Descriptions and Tags
+        if (candidate.projects() != null) {
+            for (Candidate.Project proj : candidate.projects()) {
+                if (proj.description() != null) corpus.append(proj.description()).append(" ");
+                if (proj.tags() != null) corpus.append(String.join(" ", proj.tags())).append(" ");
+            }
+        }
+
+        return corpus.toString();
+    }
+
+
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+
+public interface ScoringStrategy {
+    // Takes the candidate's profile and the target job description, returns a score 0-100
+    double calculateScore(Candidate candidate, Job job);
+    DetailedScore calculateDetailedScore(Candidate candidate, Job job);
+}package com.bld.ats.scoring;
+
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.model.Job.SkillSet;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+public class WeightedPriorityStrategy implements ScoringStrategy {
+
+    private static final double MANDATORY_WEIGHT = 0.70;
+    private static final double NICE_TO_HAVE_WEIGHT = 0.30;
+
+    @Override
+    public double calculateScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return 0;
+        }
+
+        // 1. Flatten all candidate skills into a single searchable pool
+        Set<String> candidateSkillPool = extractCandidateSkills(candidate);
+
+        // 2. Calculate percentages for both requirement categories
+        double mandatoryScore = calculateCategoryMatch(
+                job.requirements().mandatorySkills(), candidateSkillPool);
+                
+        double niceToHaveScore = calculateCategoryMatch(
+                job.requirements().niceToHaveSkills(), candidateSkillPool);
+
+        // 3. Apply weights and calculate final score (out of 100)
+        double finalScore = (mandatoryScore * MANDATORY_WEIGHT) + (niceToHaveScore * NICE_TO_HAVE_WEIGHT);
+        
+        return  Math.round(finalScore * 100);
+    }
+
+    /**
+     * Digs through the candidate's dynamic map and project tags to build a master list of skills.
+     */
+    private Set<String> extractCandidateSkills(Candidate candidate) {
+        Set<String> pool = new HashSet<>();
+
+        // Add all categorized skills
+        if (candidate.categorizedSkills() != null) {
+            for (List<String> skillList : candidate.categorizedSkills().values()) {
+                if (skillList != null) {
+                    for (String skill : skillList) {
+                        pool.add(skill.toLowerCase().trim());
+                    }
+                }
+            }
+        }
+
+        // Add project tags as a backup (e.g., if they used "Docker" in a project but forgot to list it in skills)
+        if (candidate.projects() != null) {
+            for (Candidate.Project project : candidate.projects()) {
+                if (project.tags() != null) {
+                    for (String tag : project.tags()) {
+                        pool.add(tag.toLowerCase().trim());
+                    }
+                }
+            }
+        }
+
+        return pool;
+    }
+
+    /**
+     * Compares the Job's rigid SkillSet against the Candidate's flattened skill pool.
+     */
+    private double calculateCategoryMatch(SkillSet requiredSkills, Set<String> candidatePool) {
+        if (requiredSkills == null) return 0.0;
+
+        // Combine all required skills from this specific Job SkillSet
+        List<String> allRequired = new ArrayList<>();
+        if (requiredSkills.programmingLanguages() != null) allRequired.addAll(requiredSkills.programmingLanguages());
+        if (requiredSkills.frameworksAndTools() != null) allRequired.addAll(requiredSkills.frameworksAndTools());
+        if (requiredSkills.softSkills() != null) allRequired.addAll(requiredSkills.softSkills());
+
+        if (allRequired.isEmpty()) return 1.0; // If they don't require anything, it's an automatic 100% match
+
+        int matchCount = 0;
+
+        for (String requirement : allRequired) {
+            if (isSkillPresent(requirement, candidatePool)) {
+                matchCount++;
+            }
+        }
+
+        return (double) matchCount / allRequired.size();
+    }
+
+    /**
+     * Helper method to do "fuzzy" string matching.
+     */
+    private boolean isSkillPresent(String requirement, Set<String> candidatePool) {
+        String reqLower = requirement.toLowerCase().trim();
+
+        for (String candidateSkill : candidatePool) {
+            // Check for exact match OR if one string is inside the other
+            // Example: requirement="React", candidateSkill="React.js" -> Match!
+            if (candidateSkill.equals(reqLower) || 
+                candidateSkill.contains(reqLower) || 
+                reqLower.contains(candidateSkill)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    @Override
+    public 
+    DetailedScore calculateDetailedScore(Candidate candidate, Job job) {
+        if (candidate == null || job == null || job.requirements() == null) {
+            return new DetailedScore(0, 0, 0, new ArrayList<>(), new ArrayList<>(), null);
+        }
+
+        Set<String> candidateSkillPool = extractCandidateSkills(candidate);
+
+        // Track exactly what they have and what they are missing
+        List<String> matchedSkills = new ArrayList<>();
+        List<String> missingSkills = new ArrayList<>();
+
+        // Analyze Mandatory Skills
+        double mandatoryScore = analyzeCategory(
+                job.requirements().mandatorySkills(), candidateSkillPool, matchedSkills, missingSkills);
+                
+        // Analyze Nice-To-Have Skills
+        double niceToHaveScore = analyzeCategory(
+                job.requirements().niceToHaveSkills(), candidateSkillPool, matchedSkills, missingSkills);
+
+        // Math
+        double finalScore = (mandatoryScore * MANDATORY_WEIGHT) + (niceToHaveScore * NICE_TO_HAVE_WEIGHT);
+        int finalScoreInt = (int) Math.round(finalScore * 100);
+
+        return new DetailedScore(
+                finalScoreInt, 
+                (int) Math.round(mandatoryScore * 100), 
+                (int) Math.round(niceToHaveScore * 100), 
+                matchedSkills, 
+                missingSkills,
+                candidate
+        );
+    }
+    /**
+     * Helper method to analyze a specific category and populate our lists.
+     */
+    private double analyzeCategory(SkillSet requiredSkills, 
+                                   Set<String> candidatePool, 
+                                   List<String> matchedSkills, 
+                                   List<String> missingSkills) {
+        if (requiredSkills == null) return 0.0;
+
+        List<String> allRequired = new ArrayList<>();
+        if (requiredSkills.programmingLanguages() != null) allRequired.addAll(requiredSkills.programmingLanguages());
+        if (requiredSkills.frameworksAndTools() != null) allRequired.addAll(requiredSkills.frameworksAndTools());
+        if (requiredSkills.softSkills() != null) allRequired.addAll(requiredSkills.softSkills());
+
+        if (allRequired.isEmpty()) return 1.0;
+
+        int matchCount = 0;
+
+        for (String requirement : allRequired) {
+            if (isSkillPresent(requirement, candidatePool)) {
+                matchCount++;
+                matchedSkills.add(requirement);
+            } else {
+                missingSkills.add(requirement);
+            }
+        }
+
+        return (double) matchCount / allRequired.size();
+    }
+}
+package com.bld.ats.service;
+
+import java.io.IOException;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.bld.ats.extraction.CandidateInfoExtractor;
+import com.bld.ats.extraction.JobInfoExtractor;
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.scoring.CVScoringEngine;
+import com.bld.ats.scoring.DetailedScore;
+import com.bld.ats.scoring.WeightedPriorityStrategy;
+
+
+public class AtsProcessingService {
+  private final CandidateInfoExtractor candidateExtractor;
+  private final JobInfoExtractor jobExtractor;
+  private final CVScoringEngine scoringEngine;
+
+  public AtsProcessingService() {
+      this.candidateExtractor = new CandidateInfoExtractor();
+      this.jobExtractor = new JobInfoExtractor();
+      
+      // We inject our smart strategy here! 
+      // If you ever want to change how the ATS scores, you ONLY change this one line.
+      this.scoringEngine = new CVScoringEngine(new WeightedPriorityStrategy());
+  }
+
+  public DetailedScore evaluateCandidate(MultipartFile cvFile, String rawJobDescriptionText) {
+      try (PDDocument document = Loader.loadPDF(cvFile.getInputStream().readAllBytes())) {
+      PDFTextStripper stripper = new PDFTextStripper();
+      String rawCvText = stripper.getText(document);
+      
+
+      // STEP 1: Extract the data using AI (The API Calls)
+      System.out.println("Extracting Candidate Data...");
+      Candidate candidate = candidateExtractor.extractInfosWithAI(rawCvText);
+      
+      System.out.println("Extracting Job Data...");
+      Job job = jobExtractor.extractInfosWithAI(rawJobDescriptionText);
+
+      // STEP 2: Safety Check (If the AI failed or API timed out)
+      if (candidate == null || job == null) {
+          throw new RuntimeException("AI Extraction Failed"); 
+      }
+      // STEP 3: CALCULATE THE SCORE HERE
+      System.out.println("Calculating Match Score...");
+      return scoringEngine.matchDetailedScore(candidate, job);
+
+
+    }   catch (IOException e) {
+      return null;
+    }
+  }
+}
