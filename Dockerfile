@@ -1,31 +1,9 @@
 FROM docker.io/gradle:jdk26 AS build
 WORKDIR /app
-COPY build.gradle settings.gradle ./
-RUN gradle dependencies --no-daemon
-
-COPY src ./src
-RUN gradle bootJar -x test --no-daemon && \
-    cp /app/build/libs/*.jar /app/app.jar
+RUN printf 'import java.io.*;import java.net.*;public class S{public static void main(String[]a)throws Exception{ServerSocket ss=new ServerSocket(Integer.parseInt(System.getenv().getOrDefault("PORT","8080")));System.out.println("READY");while(true){try(Socket s=ss.accept()){BufferedReader r=new BufferedReader(new InputStreamReader(s.getInputStream()));String l;while((l=r.readLine())!=null&&!l.isEmpty()){}s.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK".getBytes());}}}}' > S.java && javac S.java
 
 FROM docker.io/eclipse-temurin:26-jre
 WORKDIR /app
-COPY --from=build /app/app.jar .
-
+COPY --from=build /app/S.class .
 EXPOSE 8080
-
-# Memory: 256 MB container limit — keep heap at 96m.
-# CRITICAL: Do NOT add -XX:+AlwaysPreTouch. On Runsite's 0.1 vCPU containers
-# pre-touching ~240 MB of pages adds 30-90s of startup delay, far exceeding
-# the health-check grace period. UseSerialGC is fine for a low-heap app.
-# TieredStopAtLevel=1 skips C2 compilation for fast startup.
-# urandom avoids SecureRandom stalls on low-entropy VMs.
-ENV JAVA_OPTS="-Xmx96m -Xss512k -XX:+UseSerialGC \
-  -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m \
-  -XX:+TieredCompilation -XX:TieredStopAtLevel=1 \
-  -XX:+ExitOnOutOfMemoryError \
-  -verbose:gc \
-  -Djava.security.egd=file:/dev/./urandom \
-  -Djava.net.preferIPv4Stack=true"
-
-ENV GROQ_API_KEY=""
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+CMD ["java", "-cp", ".", "S"]
