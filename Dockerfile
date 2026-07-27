@@ -11,6 +11,6 @@ FROM docker.io/eclipse-temurin:26-jre
 WORKDIR /app
 COPY --from=build /app/app.jar .
 EXPOSE 8080
-ENV JAVA_OPTS="-Xmx100m -Xss256k -XX:+UseSerialGC -XX:MaxMetaspaceSize=64m"
+ENV JAVA_OPTS="-Xmx80m -Xss256k -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m"
 ENV GROQ_API_KEY=""
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
