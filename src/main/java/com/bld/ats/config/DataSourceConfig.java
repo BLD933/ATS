@@ -1,7 +1,7 @@
 package com.bld.ats.config;
 
 import com.zaxxer.hikari.HikariDataSource;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,10 +12,10 @@ import java.net.URI;
 public class DataSourceConfig {
 
     @Bean
-    @ConditionalOnProperty(name = "DATABASE_URL")
+    @ConditionalOnExpression("'${DATABASE_URL:}' != ''")
     public DataSource dataSource() {
         String databaseUrl = System.getenv("DATABASE_URL");
-        URI uri = URI.create(databaseUrl);
+        URI uri = URI.create(databaseUrl.replace("postgresql://", "http://"));
 
         String[] userInfo = uri.getUserInfo().split(":", 2);
         String username = userInfo[0];
