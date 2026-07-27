@@ -1,5 +1,6 @@
 package com.bld.ats.config;
 
+import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
@@ -24,11 +25,13 @@ public class DataSourceConfig {
         int port = uri.getPort() == -1 ? 5432 : uri.getPort();
         String jdbcUrl = "jdbc:postgresql://" + uri.getHost() + ":" + port + uri.getPath();
 
-        HikariDataSource ds = new HikariDataSource();
-        ds.setJdbcUrl(jdbcUrl);
-        ds.setUsername(username);
-        ds.setPassword(password);
-        ds.setDriverClassName("org.postgresql.Driver");
-        return ds;
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(jdbcUrl);
+        config.setUsername(username);
+        config.setPassword(password);
+        config.setDriverClassName("org.postgresql.Driver");
+        config.setConnectionTimeout(5000);
+        config.setMaximumPoolSize(3);
+        return new HikariDataSource(config);
     }
 }

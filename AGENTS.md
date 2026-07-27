@@ -96,6 +96,21 @@ Flow: `AtsController` → `AtsProcessingService` → AI extraction via Groq API 
 - **DTOs**: `DetailedScore` is a Java `record`; model classes (`Candidate`, `Job`) are POJOs with record-style accessors.
 - **Model pattern**: All model classes use `@JsonAutoDetect(fieldVisibility = ANY)` + `@JsonIgnoreProperties(ignoreUnknown = true)` so Jackson serializes/deserializes private fields directly without getters/setters. Nested types are static inner classes.
 
+## Production (Runsite)
+
+Deployed at **https://ats.runsite.app** (Runsite free tier — 256 MB, 0.1 vCPU).
+
+Connects to PostgreSQL via `DATABASE_URL` env var, parsed by `DataSourceConfig` using `@ConditionalOnExpression`.  
+When `DATABASE_URL` is not set (local dev), falls back to `application.properties` (H2 or individual env vars).
+
+Env vars set in Runsite dashboard:
+- `GROQ_API_KEY` — Groq LLM API key
+- `SPRING_PROFILES_ACTIVE=prod` — enables PostgreSQL mode
+- `DATABASE_URL` — PostgreSQL connection URL (internal: `dpg-*.runsite.app`)
+
+The root `Dockerfile` is auto-detected by Runsite. JVM auto-sizes heap via `-XX:+UseContainerSupport` (default on Java 10+).  
+`DataSourceConfig` stores secrets as env vars (not in code or config).
+
 ## Gotchas
 
 - `JobInfoExtractor` creates its own local `ObjectMapper` (line 19) instead of using the inherited one — different instance from `CandidateInfoExtractor`.
