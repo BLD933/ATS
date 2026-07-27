@@ -11,19 +11,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class JobInfoExtractor implements InfoExtractor<Job> {
-
-    // You get this from the AI provider (e.g., Google AI Studio)
+/** Extracts structured job requirements from raw job description text using the Groq LLM. */
+public class JobInfoExtractor extends InfoExtractor<Job> {
 
     @Override
     public Job extractInfosWithAI(String rawResumeText) {
         ObjectMapper objectMapper = new ObjectMapper();
 
         try {
-
+            // Build a few-shot prompt: system instruction + example input/output + real input
             ObjectNode requestBody = objectMapper.createObjectNode();
-
-            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+            ArrayNode messages = objectMapper.createArrayNode();
 
             ObjectNode systemMsg = objectMapper.createObjectNode();
 
@@ -68,6 +66,7 @@ public class JobInfoExtractor implements InfoExtractor<Job> {
             messages.add(userMsg);
             requestBody.set("messages", messages);
 
+            // Configure the LLM request: low temperature for deterministic output
             requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
             requestBody.put("temperature", 0);
             requestBody.put("max_completion_tokens", 1024);
@@ -75,17 +74,7 @@ public class JobInfoExtractor implements InfoExtractor<Job> {
             requestBody.put("stream", false);
             requestBody.putNull("stop");
 
-            // ObjectNode compound_custom = objectMapper.createObjectNode();
-            // ArrayNode enabled_tools = objectMapper.createArrayNode();
-            // enabled_tools.add("web_search");
-            // enabled_tools.add("code_interpreter");
-            // enabled_tools.add("visit_website");
-            // compound_custom.set("enabled_tools", enabled_tools);
-            // requestBody.set("compound_custom", compound_custom);
-
-
-
-            
+            // Send the request and parse the JSON response
             String jsonPayload = objectMapper.writeValueAsString(requestBody);
             HttpClient client = HttpClient.newHttpClient();
 
@@ -95,15 +84,10 @@ public class JobInfoExtractor implements InfoExtractor<Job> {
                     .header("Authorization", "Bearer " + API_KEY)
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
-
-            // 4. Send the request and wait for the AI's response
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
             String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText();
-            System.out.println("Parsed info: " + parsedInfo);
-            Job jobObj = objectMapper.readValue(parsedInfo, Job.class);
-            // The response will contain the JSON array of skills the AI found!
-            return jobObj;
+
+            return objectMapper.readValue(parsedInfo, Job.class);
 
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();

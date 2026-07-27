@@ -37,9 +37,23 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     Analyze Candidate
                 </button>
+                <button type="button" class="history-btn" onclick="toggleHistory()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    View History
+                </button>
             </form>
         </div>
 
+
+        <!-- ================= HISTORY SECTION ================= -->
+        <div id="historySection" class="hidden fade-in">
+            <div class="ats-header">
+                <h2>Analysis History</h2>
+                <p>Previous CV analysis results</p>
+            </div>
+            <div id="historyList" class="history-list"></div>
+            <button type="button" class="reset-btn" onclick="hideHistory()">Back</button>
+        </div>
 
         <!-- ================= RESULTS SECTION ================= -->
         <div id="resultsDashboard" class="ats-results hidden fade-in">
@@ -118,8 +132,7 @@
             formData.append('jobDescription', jobDescription.value); // Ensure this matches @RequestParam in Java
 
             try {
-                // Remove the URL domain to allow relative fetching if hosted, or keep localhost for dev
-                const response = await fetch('http://localhost:8080/api/v1/cv/analyze', {
+                const response = await fetch('/api/v1/cv/analyze', {
                     method: 'POST',
                     body: formData 
                 });
@@ -210,6 +223,103 @@
         const style = document.createElement('style');
         style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
         document.head.appendChild(style);
+
+        // ================= HISTORY =================
+        async function toggleHistory() {
+            const section = document.getElementById('historySection');
+            const formSection = document.getElementById('formSection');
+            const isVisible = !section.classList.contains('hidden');
+
+            if (!isVisible) {
+                formSection.classList.add('hidden');
+                section.classList.remove('hidden');
+                await loadHistory();
+            } else {
+                hideHistory();
+            }
+        }
+
+        function hideHistory() {
+            document.getElementById('historySection').classList.add('hidden');
+            document.getElementById('formSection').classList.remove('hidden');
+        }
+
+        async function loadHistory() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = '<p style="color:#64748b; padding: 20px;">Loading...</p>';
+            try {
+                const res = await fetch('/api/v1/cv/results');
+                if (!res.ok) throw new Error('Failed to fetch');
+                const results = await res.json();
+                if (results.length === 0) {
+                    list.innerHTML = '<p style="color:#64748b; padding: 20px;">No analyses yet.</p>';
+                    return;
+                }
+                list.innerHTML = results.map(r => {
+                    let name = 'Unknown';
+                    try {
+                        const cd = JSON.parse(r.candidateData || '{}');
+                        name = cd.personalInfo?.fullName || 'Unknown';
+                    } catch(e) {}
+                    const date = r.createdAt ? new Date(r.createdAt).toLocaleString() : '';
+                    return `
+                        <div class="history-item" onclick="viewResult(${r.id})">
+                            <div class="history-score">${r.finalScore}%</div>
+                            <div class="history-body">
+                                <div class="history-name">${escapeHtml(name)}</div>
+                                <div class="history-date">${date}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                list.innerHTML = '<p style="color:#fb7185; padding: 20px;">Failed to load history.</p>';
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function viewResult(id) {
+            try {
+                const res = await fetch('/api/v1/cv/results');
+                if (!res.ok) throw new Error('Failed to fetch');
+                const results = await res.json();
+                const r = results.find(x => x.id === id);
+                if (!r) throw new Error('Not found');
+
+                let candidateName = 'Unknown', candidateEmail = '', candidatePhone = '';
+                try {
+                    const cd = JSON.parse(r.candidateData || '{}');
+                    candidateName = cd.personalInfo?.fullName || 'Unknown';
+                    candidateEmail = cd.personalInfo?.email || 'No email available';
+                    candidatePhone = cd.personalInfo?.phone || 'No phone available';
+                } catch(e) {}
+
+                let matchedSkills = [], missingSkills = [];
+                try { matchedSkills = JSON.parse(r.matchedSkills || '[]'); } catch(e) {}
+                try { missingSkills = JSON.parse(r.missingSkills || '[]'); } catch(e) {}
+
+                document.getElementById('candidateName').textContent = candidateName;
+                document.getElementById('candidateEmail').textContent = candidateEmail;
+                document.getElementById('candidatePhone').textContent = candidatePhone;
+
+                const matchedHTML = matchedSkills.map(s => `<span class="tag matched">${escapeHtml(s)}</span>`).join('');
+                document.getElementById('matchedSkillsList').innerHTML = matchedHTML || '<span style="color:#64748b; font-size:13px;">No direct matches found.</span>';
+
+                const missingHTML = missingSkills.map(s => `<span class="tag missing">${escapeHtml(s)}</span>`).join('');
+                document.getElementById('missingSkillsList').innerHTML = missingHTML || '<span style="color:#64748b; font-size:13px;">No missing skills!</span>';
+
+                document.getElementById('historySection').classList.add('hidden');
+                document.getElementById('resultsDashboard').classList.remove('hidden');
+                animateScore(r.finalScore || 0);
+            } catch (e) {
+                alert('Failed to load result.');
+            }
+        }
     </script>
 </body>
 </html>

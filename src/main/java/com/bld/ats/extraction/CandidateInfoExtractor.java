@@ -6,25 +6,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 import com.bld.ats.model.Candidate;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class CandidateInfoExtractor implements InfoExtractor<Candidate> {
-
-    // You get this from the AI provider (e.g., Google AI Studio)
-
-    
+/** Extracts structured candidate data from raw resume text using the Groq LLM. */
+public class CandidateInfoExtractor extends InfoExtractor<Candidate> {
 
     @Override
     public Candidate extractInfosWithAI(String rawResumeText) {
-        ObjectMapper objectMapper = new ObjectMapper();
-
         try {
-
+            // Build a few-shot prompt: system instruction + example input/output + real input
             ObjectNode requestBody = objectMapper.createObjectNode();
-
-            ArrayNode messages = objectMapper.createArrayNode(); // ArrayNode
+            ArrayNode messages = objectMapper.createArrayNode();
 
             ObjectNode systemMsg = objectMapper.createObjectNode();
 
@@ -56,8 +49,8 @@ public class CandidateInfoExtractor implements InfoExtractor<Candidate> {
             messages.add(userMsg);
 
 
+            // Configure the LLM request: low temperature for deterministic output
             requestBody.set("messages", messages);
-
             requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
             requestBody.put("temperature", 0);
             requestBody.put("max_completion_tokens", 1024);
@@ -65,6 +58,7 @@ public class CandidateInfoExtractor implements InfoExtractor<Candidate> {
             requestBody.put("stream", false);
             requestBody.putNull("stop");
 
+            // Send the request and parse the JSON response
             String jsonPayload = objectMapper.writeValueAsString(requestBody);
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
@@ -74,15 +68,10 @@ public class CandidateInfoExtractor implements InfoExtractor<Candidate> {
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
 
-            // 4. Send the request and wait for the AI's response
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText();
 
-            String parsedInfo = objectMapper.readTree(response.body()).path("choices").get(0).path("message").path("content").asText(); // Get the content of the AI's response
-            System.out.println(parsedInfo);
-
-            Candidate candidate = objectMapper.readValue(parsedInfo, Candidate.class);
-            // The response will contain the JSON array of skills the AI found!
-            return candidate;
+            return objectMapper.readValue(parsedInfo, Candidate.class);
 
         } catch (Exception e) {
             e.printStackTrace();

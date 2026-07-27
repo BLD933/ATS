@@ -1,12 +1,23 @@
 package com.bld.ats.scoring;
 
-import com.bld.ats.model.Candidate;
-import com.bld.ats.model.Job;
-import com.bld.ats.model.Job.SkillSet;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.bld.ats.model.Candidate;
+import com.bld.ats.model.Job;
+import com.bld.ats.model.Job.SkillSet;
+
+/**
+ * Keyword matching strategy: builds a single text corpus from all candidate
+ * data (summary, skills, experience, projects) and searches for each job
+ * requirement keyword within it. A keyword matches if it appears as a
+ * substring of the corpus.
+ *
+ * Unlike WeightedPriorityStrategy, this strategy searches the full text of the
+ * candidate's experience descriptions and project details, not just skill lists.
+ */
 public class KeywordMatchStrategy implements ScoringStrategy {
 
     @Override
@@ -15,48 +26,95 @@ public class KeywordMatchStrategy implements ScoringStrategy {
             return 0;
         }
 
-        // 1. Extract every single requirement from the Job
+        // Collect all requirements from both mandatory and nice-to-have categories
         Set<String> targetKeywords = extractJobKeywords(job);
         if (targetKeywords.isEmpty()) {
-            return 100; // No requirements means instant match
+            return 100;
         }
 
-        // 2. Build a massive "Corpus" (a giant string) of everything the candidate wrote
+        // Flatten all candidate text into a single lowercase corpus
         String candidateCorpus = buildCandidateCorpus(candidate).toLowerCase();
 
-        // 3. Count how many keywords appear in the corpus
+        // Count how many keywords appear in the corpus
         int matches = 0;
         for (String keyword : targetKeywords) {
-            // We pad with spaces to avoid accidental substring matches 
-            // e.g., finding "C" inside "React"
-            if (candidateCorpus.contains(" " + keyword.toLowerCase() + " ") || 
-                candidateCorpus.contains(keyword.toLowerCase())) { 
+            // Check both space-padded (exact word) and bare (substring) forms
+            // to avoid false matches like "C" inside "React" while still catching "C++"
+            if (candidateCorpus.contains(" " + keyword.toLowerCase() + " ") ||
+                candidateCorpus.contains(keyword.toLowerCase())) {
                 matches++;
             }
         }
 
-        // 4. Calculate percentage
         double score = (double) matches / targetKeywords.size();
         return Math.round(score * 100);
     }
 
     @Override
     public DetailedScore calculateDetailedScore(Candidate candidate, Job job) {
-        return null;
+        if (candidate == null || job == null || job.requirements() == null) {
+            return new DetailedScore(0, 0, 0, new ArrayList<>(), new ArrayList<>(), candidate);
+        }
+
+        String candidateCorpus = buildCandidateCorpus(candidate).toLowerCase();
+
+        // Separate mandatory and nice-to-have for individual score reporting
+        Set<String> mandatoryKeywords = new HashSet<>();
+        addSkillsToSet(mandatoryKeywords, job.requirements().mandatorySkills());
+
+        Set<String> niceToHaveKeywords = new HashSet<>();
+        addSkillsToSet(niceToHaveKeywords, job.requirements().niceToHaveSkills());
+
+        List<String> matchedSkills = new ArrayList<>();
+        List<String> missingSkills = new ArrayList<>();
+
+        int mandatoryMatches = analyzeCorpusMatch(mandatoryKeywords, candidateCorpus, matchedSkills, missingSkills);
+        int niceToHaveMatches = analyzeCorpusMatch(niceToHaveKeywords, candidateCorpus, matchedSkills, missingSkills);
+
+        double mandatoryScore = mandatoryKeywords.isEmpty() ? 1.0 : (double) mandatoryMatches / mandatoryKeywords.size();
+        double niceToHaveScore = niceToHaveKeywords.isEmpty() ? 1.0 : (double) niceToHaveMatches / niceToHaveKeywords.size();
+
+        // Final score = total matches / total requirements (unweighted)
+        int totalTargetSize = mandatoryKeywords.size() + niceToHaveKeywords.size();
+        int totalMatches = mandatoryMatches + niceToHaveMatches;
+
+        double finalScore = totalTargetSize == 0 ? 1.0 : (double) totalMatches / totalTargetSize;
+
+        return new DetailedScore(
+            (int) Math.round(finalScore * 100),
+            (int) Math.round(mandatoryScore * 100),
+            (int) Math.round(niceToHaveScore * 100),
+            matchedSkills,
+            missingSkills,
+            candidate
+        );
     }
-    /**
-     * Grabs all mandatory and nice-to-have skills from the job description.
-     */
+
+    /** Searches the corpus for each keyword, populating matched and missing lists. */
+    private int analyzeCorpusMatch(Set<String> keywords, String corpus, List<String> matched, List<String> missing) {
+        int matchCount = 0;
+        for (String keyword : keywords) {
+            String lowerKeyword = keyword.toLowerCase();
+            // Check space-padded version first (exact word), then bare substring
+            if (corpus.contains(" " + lowerKeyword + " ") || corpus.contains(lowerKeyword)) {
+                matchCount++;
+                matched.add(keyword); // Keep original casing for UI display
+            } else {
+                missing.add(keyword);
+            }
+        }
+        return matchCount;
+    }
+
+    /** Collects all mandatory + nice-to-have skills from the job into a flat set. */
     private Set<String> extractJobKeywords(Job job) {
         Set<String> keywords = new HashSet<>();
-        
-        // Helper lambda/method to safely add skills
         addSkillsToSet(keywords, job.requirements().mandatorySkills());
         addSkillsToSet(keywords, job.requirements().niceToHaveSkills());
-        
         return keywords;
     }
 
+    /** Flattens a SkillSet (programmingLanguages, frameworksAndTools, softSkills) into a set. */
     private void addSkillsToSet(Set<String> set, SkillSet skillSet) {
         if (skillSet == null) return;
         if (skillSet.programmingLanguages() != null) set.addAll(skillSet.programmingLanguages());
@@ -65,7 +123,8 @@ public class KeywordMatchStrategy implements ScoringStrategy {
     }
 
     /**
-     * Smashes all candidate data into one massive, searchable string block.
+     * Concatenates all candidate data (summary, skills, experience descriptions,
+     * project descriptions) into a single searchable string for keyword matching.
      */
     private String buildCandidateCorpus(Candidate candidate) {
         StringBuilder corpus = new StringBuilder();
@@ -74,7 +133,6 @@ public class KeywordMatchStrategy implements ScoringStrategy {
             corpus.append(candidate.summary()).append(" ");
         }
 
-        // Add Skills
         if (candidate.categorizedSkills() != null) {
             for (List<String> skills : candidate.categorizedSkills().values()) {
                 if (skills != null) {
@@ -83,7 +141,6 @@ public class KeywordMatchStrategy implements ScoringStrategy {
             }
         }
 
-        // Add Experience Descriptions
         if (candidate.experience() != null) {
             for (Candidate.Experience exp : candidate.experience()) {
                 if (exp.description() != null) corpus.append(exp.description()).append(" ");
@@ -91,7 +148,6 @@ public class KeywordMatchStrategy implements ScoringStrategy {
             }
         }
 
-        // Add Project Descriptions and Tags
         if (candidate.projects() != null) {
             for (Candidate.Project proj : candidate.projects()) {
                 if (proj.description() != null) corpus.append(proj.description()).append(" ");
@@ -101,6 +157,4 @@ public class KeywordMatchStrategy implements ScoringStrategy {
 
         return corpus.toString();
     }
-
-
 }
