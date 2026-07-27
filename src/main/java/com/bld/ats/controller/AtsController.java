@@ -16,10 +16,11 @@ import com.bld.ats.repository.AnalysisResultRepository;
 import com.bld.ats.scoring.DetailedScore;
 import com.bld.ats.service.AtsProcessingService;
 
-/** REST controller exposing the CV analysis endpoint. */
+import java.util.Map;
+
+/** REST controller exposing the CV analysis endpoint and health check. */
 @RestController
 @CrossOrigin(origins = "*")
-@RequestMapping("/api/v1/cv")
 public class AtsController {
 
     private final AtsProcessingService atsService;
@@ -30,7 +31,16 @@ public class AtsController {
         this.analysisResultRepository = analysisResultRepository;
     }
 
-    @GetMapping("/results")
+    /**
+     * Health check endpoint for Runsite platform health probes.
+     * Returns 200 OK immediately — critical for deployment stability.
+     */
+    @GetMapping({"/", "/health"})
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of("status", "UP"));
+    }
+
+    @GetMapping("/api/v1/cv/results")
     public ResponseEntity<List<AnalysisResult>> getResults() {
         return ResponseEntity.ok(analysisResultRepository.findAllByOrderByCreatedAtDesc());
     }
@@ -39,7 +49,7 @@ public class AtsController {
      * Accepts a PDF resume and a job description, returns a detailed match score
      * with skill gap analysis.
      */
-    @PostMapping("/analyze")
+    @PostMapping("/api/v1/cv/analyze")
     public ResponseEntity<DetailedScore> analyzeCv(@RequestParam("cvFile") MultipartFile cvFile,
                                                    @RequestParam("jobDescription") String jobDescription) {
         try {
