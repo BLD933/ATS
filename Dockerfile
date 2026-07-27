@@ -13,11 +13,8 @@ COPY --from=build /app/app.jar .
 
 EXPOSE 8080
 
-ENV JAVA_OPTS="-Xmx96m -Xss256k -XX:+UseSerialGC \
-  -XX:MaxMetaspaceSize=48m -XX:ReservedCodeCacheSize=32m \
-  -XX:+TieredCompilation -XX:TieredStopAtLevel=1 \
+ENV JAVA_OPTS="-Xmx384m -XX:+UseSerialGC \
   -XX:+ExitOnOutOfMemoryError \
   -Djava.security.egd=file:/dev/urandom"
 
-ENV GROQ_API_KEY=""
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
