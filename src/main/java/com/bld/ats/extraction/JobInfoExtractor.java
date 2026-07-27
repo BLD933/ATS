@@ -67,7 +67,7 @@ public class JobInfoExtractor extends InfoExtractor<Job> {
             requestBody.set("messages", messages);
 
             // Configure the LLM request: low temperature for deterministic output
-            requestBody.put("model", "meta-llama/llama-4-scout-17b-16e-instruct");
+            requestBody.put("model", "llama-3.3-70b-versatile");
             requestBody.put("temperature", 0);
             requestBody.put("max_completion_tokens", 1024);
             requestBody.put("top_p", 1);

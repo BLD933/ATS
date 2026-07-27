@@ -35,7 +35,7 @@ public class AtsController {
      * Health check endpoint for Runsite platform health probes.
      * Returns 200 OK immediately — critical for deployment stability.
      */
-    @GetMapping({"/", "/health"})
+    @GetMapping("/health")
     public ResponseEntity<Map<String, String>> health() {
         return ResponseEntity.ok(Map.of("status", "UP"));
     }
