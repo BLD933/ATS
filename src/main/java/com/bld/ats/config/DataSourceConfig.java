@@ -30,8 +30,12 @@ public class DataSourceConfig {
         config.setUsername(username);
         config.setPassword(password);
         config.setDriverClassName("org.postgresql.Driver");
-        config.setConnectionTimeout(5000);
-        config.setMaximumPoolSize(3);
+        config.setConnectionTimeout(10000);
+        config.setMaximumPoolSize(2);
+        config.setMinimumIdle(1);
+        config.setValidationTimeout(5000);
+        config.setLeakDetectionThreshold(15000);
+        config.setKeepaliveTime(30000);
         return new HikariDataSource(config);
     }
 }

@@ -13,7 +13,7 @@ COPY --from=build /app/app.jar .
 
 EXPOSE 8080
 
-ENV JAVA_OPTS="-Xmx64m -Xss256k -XX:+UseSerialGC \
+ENV JAVA_OPTS="-Xmx128m -Xss256k -XX:+UseSerialGC \
   -XX:MaxMetaspaceSize=64m -XX:ReservedCodeCacheSize=32m \
   -XX:+TieredCompilation -XX:TieredStopAtLevel=1 \
   -XX:+ExitOnOutOfMemoryError \
