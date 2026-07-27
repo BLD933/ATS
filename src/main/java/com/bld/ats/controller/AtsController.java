@@ -6,7 +6,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,9 +15,6 @@ import com.bld.ats.repository.AnalysisResultRepository;
 import com.bld.ats.scoring.DetailedScore;
 import com.bld.ats.service.AtsProcessingService;
 
-import java.util.Map;
-
-/** REST controller exposing the CV analysis endpoint and health check. */
 @RestController
 @CrossOrigin(origins = "*")
 public class AtsController {
@@ -31,24 +27,11 @@ public class AtsController {
         this.analysisResultRepository = analysisResultRepository;
     }
 
-    /**
-     * Health check endpoint for Runsite platform health probes.
-     * Returns 200 OK immediately — critical for deployment stability.
-     */
-    @GetMapping("/health")
-    public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of("status", "UP"));
-    }
-
     @GetMapping("/api/v1/cv/results")
     public ResponseEntity<List<AnalysisResult>> getResults() {
         return ResponseEntity.ok(analysisResultRepository.findAllByOrderByCreatedAtDesc());
     }
 
-    /**
-     * Accepts a PDF resume and a job description, returns a detailed match score
-     * with skill gap analysis.
-     */
     @PostMapping("/api/v1/cv/analyze")
     public ResponseEntity<DetailedScore> analyzeCv(@RequestParam("cvFile") MultipartFile cvFile,
                                                    @RequestParam("jobDescription") String jobDescription) {
