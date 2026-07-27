@@ -7,16 +7,14 @@ COPY src ./src
 RUN gradle bootJar -x test --no-daemon && \
     cp /app/build/libs/*.jar /app/app.jar
 
+FROM docker.io/library/caddy:2-alpine AS caddy
+
 FROM docker.io/eclipse-temurin:26-jre
 WORKDIR /app
 COPY --from=build /app/app.jar .
+COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
 COPY Caddyfile /etc/caddy/Caddyfile
-
-RUN apt-get update -qq && apt-get install -y -qq debian-keyring debian-archive-keyring apt-transport-https curl > /dev/null 2>&1 && \
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg > /dev/null 2>&1 && \
-    echo "deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main" > /etc/apt/sources.list.d/caddy-stable.list && \
-    apt-get update -qq && apt-get install -y -qq caddy > /dev/null 2>&1 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /etc/caddy
 
 ENV SERVER_PORT=8081
 ENV JAVA_OPTS="-Xmx100m -Xss256k -XX:+UseSerialGC -XX:MaxMetaspaceSize=64m"
